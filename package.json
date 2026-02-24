@@ -1,0 +1,36 @@
+{
+  "name": "agentforge-agent",
+  "version": "1.0.0",
+  "description": "OpenEMR Clinical Query AI Agent",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "test:integration": "RUN_INTEGRATION_TESTS=1 vitest run tests/agent.integration.test.ts",
+    "test:integration:fhir": "RUN_FHIR_INTEGRATION_TESTS=1 vitest run tests/fhir-integration.test.ts",
+    "test:watch": "vitest",
+    "eval": "tsx eval/run-eval.ts",
+    "build:local": "tsc"
+  },
+  "dependencies": {
+    "@langchain/anthropic": "^0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "langfuse": "^3.38.0",
+    "@langfuse/langchain": "^4.6.0",
+    "langchain": "^0.3.0",
+    "tsx": "^4.19.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
