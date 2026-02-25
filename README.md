@@ -19,7 +19,7 @@ npm run dev    # Development with hot reload
 npm start      # Production
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000 (local) or https://agent-production-6f7a.up.railway.app (production)
 
 ## Test
 
@@ -87,4 +87,4 @@ See [SECURITY.md](SECURITY.md) for the full security audit and remediation check
 - [x] Basic error handling
 - [x] Domain-specific verification (drug interaction severity)
 - [x] 5+ eval test cases
-- [ ] Deployed and publicly accessible (Railway)
+- [x] Deployed and publicly accessible (Railway)
