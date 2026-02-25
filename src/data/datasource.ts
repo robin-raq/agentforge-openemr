@@ -1,3 +1,11 @@
+export interface VitalSign {
+  name: string;
+  value: string;
+  unit: string;
+  date: string;
+  status: "normal" | "abnormal" | "critical";
+}
+
 export interface PatientData {
   patient_id: string;
   name: string;
@@ -6,6 +14,7 @@ export interface PatientData {
   conditions: string[];
   medications: { name: string; dose: string; frequency: string }[];
   allergies: string[];
+  vitals?: VitalSign[];
 }
 
 export interface MedicationData {

@@ -11,7 +11,13 @@
         { "name": "Lisinopril", "dose": "10mg", "frequency": "daily" },
         { "name": "Metformin", "dose": "500mg", "frequency": "twice daily" }
       ],
-      "allergies": ["Penicillin"]
+      "allergies": ["Penicillin"],
+      "vitals": [
+        { "name": "Blood Pressure", "value": "145/92", "unit": "mmHg", "date": "2024-01-10", "status": "abnormal" },
+        { "name": "Heart Rate", "value": "78", "unit": "bpm", "date": "2024-01-10", "status": "normal" },
+        { "name": "Temperature", "value": "98.6", "unit": "°F", "date": "2024-01-10", "status": "normal" },
+        { "name": "SpO2", "value": "98", "unit": "%", "date": "2024-01-10", "status": "normal" }
+      ]
     },
     "2": {
       "patient_id": "2",
@@ -20,7 +26,8 @@
       "gender": "female",
       "conditions": [],
       "medications": [],
-      "allergies": []
+      "allergies": [],
+      "vitals": []
     },
     "3": {
       "patient_id": "3",
@@ -31,7 +38,13 @@
       "medications": [
         { "name": "Metoprolol", "dose": "25mg", "frequency": "daily" }
       ],
-      "allergies": ["Penicillin", "Sulfa", "Latex"]
+      "allergies": ["Penicillin", "Sulfa", "Latex"],
+      "vitals": [
+        { "name": "Blood Pressure", "value": "118/76", "unit": "mmHg", "date": "2024-01-05", "status": "normal" },
+        { "name": "Heart Rate", "value": "72", "unit": "bpm", "date": "2024-01-05", "status": "normal" },
+        { "name": "Temperature", "value": "98.4", "unit": "°F", "date": "2024-01-05", "status": "normal" },
+        { "name": "SpO2", "value": "99", "unit": "%", "date": "2024-01-05", "status": "normal" }
+      ]
     },
     "4": {
       "patient_id": "4",
@@ -46,7 +59,13 @@
         { "name": "Atorvastatin", "dose": "40mg", "frequency": "daily" },
         { "name": "Omeprazole", "dose": "20mg", "frequency": "daily" }
       ],
-      "allergies": ["Codeine"]
+      "allergies": ["Codeine"],
+      "vitals": [
+        { "name": "Blood Pressure", "value": "168/98", "unit": "mmHg", "date": "2024-01-12", "status": "critical" },
+        { "name": "Heart Rate", "value": "96", "unit": "bpm", "date": "2024-01-12", "status": "abnormal" },
+        { "name": "Temperature", "value": "99.1", "unit": "°F", "date": "2024-01-12", "status": "normal" },
+        { "name": "SpO2", "value": "93", "unit": "%", "date": "2024-01-12", "status": "critical" }
+      ]
     }
   },
   "medications": {

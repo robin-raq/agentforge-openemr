@@ -2,6 +2,7 @@ import type {
   PatientData,
   MedicationData,
   LabResult,
+  VitalSign,
 } from "./datasource";
 
 // FHIR R4 types (minimal for mapping)
@@ -38,6 +39,17 @@ interface FhirObservation {
     low?: { value?: number };
     high?: { value?: number };
     text?: string;
+  }>;
+  interpretation?: Array<{ coding?: Array<{ code?: string }> }>;
+  effectiveDateTime?: string;
+}
+
+interface FhirVitalSignObservation {
+  code?: { text?: string; coding?: Array<{ code?: string; display?: string }> };
+  valueQuantity?: { value?: number; unit?: string };
+  component?: Array<{
+    code?: { coding?: Array<{ code?: string; display?: string }> };
+    valueQuantity?: { value?: number; unit?: string };
   }>;
   interpretation?: Array<{ coding?: Array<{ code?: string }> }>;
   effectiveDateTime?: string;
@@ -90,7 +102,8 @@ export function mapFhirPatient(
   patient: FhirPatient,
   conditionBundle: FhirBundle<FhirCondition>,
   medicationBundle: FhirBundle<FhirMedicationRequest>,
-  allergyBundle: FhirBundle<FhirAllergyIntolerance>
+  allergyBundle: FhirBundle<FhirAllergyIntolerance>,
+  vitalsBundle?: FhirBundle<FhirVitalSignObservation>
 ): PatientData {
   const names = patient.name ?? [];
   const first = names[0];
@@ -123,6 +136,8 @@ export function mapFhirPatient(
     });
   }
 
+  const vitals = vitalsBundle ? mapFhirVitalSigns(vitalsBundle) : [];
+
   return {
     patient_id: pid,
     name,
@@ -131,6 +146,7 @@ export function mapFhirPatient(
     conditions,
     medications,
     allergies,
+    vitals,
   };
 }
 
@@ -169,6 +185,55 @@ export function mapFhirLabResults(
       date: r.effectiveDateTime ?? "",
       flag: interpretationToFlag(code),
     });
+  }
+  return result;
+}
+
+const BP_LOINC = "85354-9";
+const SYSTOLIC_LOINC = "8480-6";
+const DIASTOLIC_LOINC = "8462-4";
+
+export function mapFhirVitalSigns(
+  bundle: FhirBundle<FhirVitalSignObservation>
+): VitalSign[] {
+  const result: VitalSign[] = [];
+  for (const e of bundle.entry ?? []) {
+    const r = e.resource;
+    if (!r) continue;
+
+    const loincCode = r.code?.coding?.[0]?.code;
+    const name = r.code?.text ?? r.code?.coding?.[0]?.display ?? "Unknown";
+    const date = r.effectiveDateTime ?? "";
+    const interpCode = r.interpretation?.[0]?.coding?.[0]?.code;
+    const status = interpretationToFlag(interpCode);
+
+    // Blood pressure uses FHIR component pattern (systolic + diastolic)
+    if (loincCode === BP_LOINC || name.toLowerCase().includes("blood pressure")) {
+      const systolic = r.component?.find(
+        (c) => c.code?.coding?.[0]?.code === SYSTOLIC_LOINC
+      );
+      const diastolic = r.component?.find(
+        (c) => c.code?.coding?.[0]?.code === DIASTOLIC_LOINC
+      );
+      const sys = systolic?.valueQuantity?.value ?? 0;
+      const dia = diastolic?.valueQuantity?.value ?? 0;
+      result.push({
+        name: "Blood Pressure",
+        value: `${sys}/${dia}`,
+        unit: "mmHg",
+        date,
+        status,
+      });
+    } else {
+      const val = r.valueQuantity?.value;
+      result.push({
+        name,
+        value: val != null ? String(val) : "",
+        unit: r.valueQuantity?.unit ?? "",
+        date,
+        status,
+      });
+    }
   }
   return result;
 }

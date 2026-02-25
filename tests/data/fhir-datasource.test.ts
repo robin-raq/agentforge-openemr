@@ -50,6 +50,7 @@ describe("FhirDataSource", () => {
     const conditions = loadFixture("condition-bundle.json");
     const meds = loadFixture("medication-request-bundle.json");
     const allergies = loadFixture("allergy-intolerance-bundle.json");
+    const vitals = loadFixture("vital-signs-bundle.json");
 
     mockToken();
     mockPatientLookup("90cde167-511f-4f6d-bc97-b65a78cf1995");
@@ -70,6 +71,10 @@ describe("FhirDataSource", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(allergies),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(vitals),
       });
   }
 
@@ -101,6 +106,8 @@ describe("FhirDataSource", () => {
     const meds = loadFixture("medication-request-bundle.json");
     const allergies = loadFixture("allergy-intolerance-bundle.json");
 
+    const vitals = loadFixture("vital-signs-bundle.json");
+
     fetchMock.mockImplementation((url: string) => {
       if (url.includes("oauth2") && url.includes("token")) {
         return Promise.resolve({
@@ -119,6 +126,9 @@ describe("FhirDataSource", () => {
       }
       if (url.includes("/AllergyIntolerance")) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(allergies) });
+      }
+      if (url.includes("/Observation") && url.includes("vital-signs")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(vitals) });
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve("") });
     });

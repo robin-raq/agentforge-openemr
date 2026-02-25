@@ -3,6 +3,7 @@ import {
   mapFhirPatient,
   mapFhirMedications,
   mapFhirLabResults,
+  mapFhirVitalSigns,
 } from "../../src/data/fhir-mappers";
 import * as fs from "fs";
 import * as path from "path";
@@ -72,6 +73,33 @@ describe("fhir-mappers", () => {
       });
       expect(result.medications[1].name).toBe("Lisinopril");
       expect(result.medications[2].name).toBe("Metformin");
+    });
+
+    it("includes vitals when vitals bundle is provided", () => {
+      const patient = loadFixture("patient.json");
+      const conditions = loadFixture("condition-bundle.json");
+      const meds = loadFixture("medication-request-bundle.json");
+      const allergies = loadFixture("allergy-intolerance-bundle.json");
+      const vitals = loadFixture("vital-signs-bundle.json");
+
+      const result = mapFhirPatient("1", patient, conditions, meds, allergies, vitals);
+
+      expect(result.vitals).toBeDefined();
+      expect(result.vitals!.length).toBe(4);
+      const bp = result.vitals!.find((v) => v.name === "Blood Pressure");
+      expect(bp?.value).toBe("145/92");
+      expect(bp?.unit).toBe("mmHg");
+    });
+
+    it("returns empty vitals when no vitals bundle provided", () => {
+      const patient = loadFixture("patient.json");
+      const conditions = loadFixture("condition-bundle.json");
+      const meds = loadFixture("medication-request-bundle.json");
+      const allergies = loadFixture("allergy-intolerance-bundle.json");
+
+      const result = mapFhirPatient("1", patient, conditions, meds, allergies);
+
+      expect(result.vitals).toEqual([]);
     });
 
     it("handles empty bundles", () => {
@@ -233,6 +261,45 @@ describe("fhir-mappers", () => {
       const result = mapFhirLabResults(bundle);
 
       expect(result[0].flag).toBe("normal");
+    });
+  });
+
+  describe("mapFhirVitalSigns", () => {
+    it("maps vital signs bundle with BP component pattern", () => {
+      const bundle = loadFixture("vital-signs-bundle.json");
+
+      const result = mapFhirVitalSigns(bundle);
+
+      expect(result).toHaveLength(4);
+      const bp = result.find((v) => v.name === "Blood Pressure");
+      expect(bp).toBeDefined();
+      expect(bp!.value).toBe("145/92");
+      expect(bp!.unit).toBe("mmHg");
+      expect(bp!.status).toBe("abnormal");
+      expect(bp!.date).toBe("2024-01-10");
+    });
+
+    it("maps simple vital signs (HR, Temp, SpO2)", () => {
+      const bundle = loadFixture("vital-signs-bundle.json");
+
+      const result = mapFhirVitalSigns(bundle);
+
+      const hr = result.find((v) => v.name === "Heart Rate");
+      expect(hr!.value).toBe("78");
+      expect(hr!.unit).toBe("bpm");
+      expect(hr!.status).toBe("normal");
+
+      const spo2 = result.find((v) => v.name === "SpO2");
+      expect(spo2!.value).toBe("98");
+      expect(spo2!.unit).toBe("%");
+    });
+
+    it("handles empty bundle", () => {
+      const empty = loadFixture("empty-bundle.json");
+
+      const result = mapFhirVitalSigns(empty);
+
+      expect(result).toEqual([]);
     });
   });
 });

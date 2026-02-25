@@ -96,14 +96,15 @@ export class FhirDataSource implements DataSource {
   async getPatient(id: string): Promise<PatientData> {
     const uuid = await this.resolveUuid(id);
 
-    const [patient, conditions, meds, allergies] = await Promise.all([
+    const [patient, conditions, meds, allergies, vitals] = await Promise.all([
       this.fhirFetch(`/Patient/${uuid}`),
       this.fhirFetch(`/Condition?patient=${uuid}&_count=100`),
       this.fhirFetch(`/MedicationRequest?patient=${uuid}&status=active&_count=100`),
       this.fhirFetch(`/AllergyIntolerance?patient=${uuid}&_count=100`),
+      this.fhirFetch(`/Observation?patient=${uuid}&category=vital-signs&_sort=-date&_count=10`),
     ]);
 
-    return mapFhirPatient(id, patient as Parameters<typeof mapFhirPatient>[1], conditions as Parameters<typeof mapFhirPatient>[2], meds as Parameters<typeof mapFhirPatient>[3], allergies as Parameters<typeof mapFhirPatient>[4]);
+    return mapFhirPatient(id, patient as Parameters<typeof mapFhirPatient>[1], conditions as Parameters<typeof mapFhirPatient>[2], meds as Parameters<typeof mapFhirPatient>[3], allergies as Parameters<typeof mapFhirPatient>[4], vitals as Parameters<typeof mapFhirPatient>[5]);
   }
 
   async getMedications(patientId: string): Promise<MedicationData[]> {
