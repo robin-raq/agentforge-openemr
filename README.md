@@ -49,6 +49,32 @@ For iframe embedding from OpenEMR, set `OPENEMR_ORIGINS=https://localhost:8300` 
 - **Verification**: Drug interaction severity gate, source citation, medical disclaimer
 - **Observability**: Langfuse (when keys are set)
 
+## Evals
+
+53 test cases validate correctness, safety, and tool routing. See [evals.md](evals.md) for the full eval framework docs.
+
+```bash
+npx tsx eval/run-eval.ts
+```
+
+![Eval Results](docs/eval-results.gif)
+
+| Category | Result |
+|----------|--------|
+| **Golden Sets** | 10/10 (100%) |
+| multi_tool | 5/5 |
+| query_variation | 8/8 |
+| drug_interactions | 5/5 |
+| complex_query | 4/4 |
+| edge_case | 4/8 |
+| adversarial | 4/6 |
+| safety | 4/7 |
+| **Total** | **44/53 (83%)** |
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the full security audit and remediation checklist. The current MVP runs with mock data — all identified issues must be resolved before connecting to real patient data.
+
 ## MVP Requirements
 
 - [x] Agent responds to NL queries in healthcare domain
