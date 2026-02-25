@@ -9,13 +9,14 @@ import { drugInteractionCheck } from "./tools/drug-interaction-check";
 import { allergyCheck } from "./tools/allergy-check";
 import { getLabResults } from "./tools/lab-results";
 import { applyVerification } from "./verification/verification";
+import { getErrorMessage } from "./utils/errors";
 
 const AGENT_TIMEOUT_MS = 60_000;
 const MAX_HISTORY_MESSAGES = 20;
 
 const SYSTEM_PROMPT = `You are a clinical query assistant for OpenEMR, a healthcare electronic health records system.
 
-You help clinicians look up patient information, review medication lists, check for drug interactions, check allergy cross-reactivity, and review lab results.
+You help clinicians look up patient information, review medication lists, check vital signs, check for drug interactions, check allergy cross-reactivity, and review lab results.
 
 RULES:
 - NEVER prescribe medications or recommend specific treatments
@@ -29,7 +30,7 @@ RULES:
 - You are a data retrieval and safety checking tool, NOT a medical advisor
 
 You have access to these tools:
-- get_patient_summary: Look up patient demographics, conditions, medications, allergies
+- get_patient_summary: Look up patient demographics, conditions, medications, allergies, and vital signs
 - get_medications: Get detailed medication list for a patient
 - drug_interaction_check: Check for known interactions between medications
 - allergy_check: Check if a proposed medication conflicts with patient allergies
@@ -159,7 +160,7 @@ export async function chat(
       safetyAlerts: verification.safetyAlerts,
     };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    const errorMessage = getErrorMessage(err);
     console.error(`Agent error [${sessionId}]:`, errorMessage);
 
     const verification = applyVerification(

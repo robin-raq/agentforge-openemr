@@ -20,7 +20,7 @@ export class MockDataSource implements DataSource {
   async getPatient(id: string): Promise<PatientData> {
     const patient = this.data.patients[id];
     if (!patient) {
-      return Promise.reject(new Error(`Patient not found: ${id}`));
+      throw new Error(`Patient not found: ${id}`);
     }
     return patient;
   }
@@ -28,18 +28,16 @@ export class MockDataSource implements DataSource {
   async getMedications(patientId: string): Promise<MedicationData[]> {
     const patient = this.data.patients[patientId];
     if (!patient) {
-      return Promise.reject(new Error(`Patient not found: ${patientId}`));
+      throw new Error(`Patient not found: ${patientId}`);
     }
-    const meds = this.data.medications[patientId] ?? [];
-    return meds;
+    return this.data.medications[patientId] ?? [];
   }
 
   async getLabResults(patientId: string): Promise<LabResult[]> {
     const patient = this.data.patients[patientId];
     if (!patient) {
-      return Promise.reject(new Error(`Patient not found: ${patientId}`));
+      throw new Error(`Patient not found: ${patientId}`);
     }
-    const labs = this.data.lab_results[patientId] ?? [];
-    return labs;
+    return this.data.lab_results[patientId] ?? [];
   }
 }

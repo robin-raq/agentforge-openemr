@@ -2,6 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 const MAX_MEDICATIONS_FOR_FDA = 10;
+const FDA_API_TIMEOUT_MS = 3000;
 
 const KNOWN_INTERACTIONS = [
   {
@@ -81,7 +82,7 @@ export function drugInteractionCheck() {
 
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000);
+        const timeout = setTimeout(() => controller.abort(), FDA_API_TIMEOUT_MS);
 
         try {
           const pairs: [string, string][] = [];

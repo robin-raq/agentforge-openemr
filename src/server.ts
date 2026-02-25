@@ -15,7 +15,8 @@ type HistoryEntry = { role: "user" | "assistant"; content: string };
 const MAX_SESSIONS = 1000;
 const MAX_HISTORY_LENGTH = 20;
 const MAX_MESSAGE_LENGTH = 2000;
-const RATE_LIMIT = 10;
+const RATE_LIMIT_PER_MINUTE = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 const sessionHistory: Map<string, { entries: HistoryEntry[]; lastAccess: number }> = new Map();
 const rateLimitMap: Record<string, { count: number; resetAt: number }> = {};
@@ -50,13 +51,12 @@ export function evictOldSessions(): void {
 
 function rateLimit(sessionId: string): boolean {
   const now = Date.now();
-  const windowMs = 60 * 1000;
   if (!rateLimitMap[sessionId] || now > rateLimitMap[sessionId].resetAt) {
-    rateLimitMap[sessionId] = { count: 1, resetAt: now + windowMs };
+    rateLimitMap[sessionId] = { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
     return true;
   }
   rateLimitMap[sessionId].count++;
-  return rateLimitMap[sessionId].count <= RATE_LIMIT;
+  return rateLimitMap[sessionId].count <= RATE_LIMIT_PER_MINUTE;
 }
 
 export function createApp(): express.Express {
