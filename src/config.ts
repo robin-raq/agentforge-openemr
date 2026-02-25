@@ -67,26 +67,45 @@ export function getAnthropicApiKey(): string {
 
 export const PORT = parseInt(process.env.PORT || "3000", 10);
 
-export function getLangfuseCallbacks(sessionId?: string): unknown[] {
+let langfuseInitialized = false;
+
+export function initLangfuse(): boolean {
+  if (langfuseInitialized) return true;
+
+  const secretKey = process.env.LANGFUSE_SECRET_KEY;
+  const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
+
+  if (!secretKey || !publicKey) return false;
+  if (isPlaceholderKey(secretKey) || isPlaceholderKey(publicKey)) {
+    console.warn("Langfuse keys contain placeholders — observability disabled. Add real keys to .env");
+    return false;
+  }
+
   try {
-    const secretKey = process.env.LANGFUSE_SECRET_KEY;
-    const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
+    const { NodeTracerProvider } = require("@opentelemetry/sdk-trace-node");
+    const { LangfuseSpanProcessor } = require("@langfuse/otel");
+    const { setLangfuseTracerProvider } = require("@langfuse/tracing");
 
-    if (!secretKey || !publicKey) {
-      return [];
-    }
+    const provider = new NodeTracerProvider({
+      spanProcessors: [new LangfuseSpanProcessor()],
+    });
+    setLangfuseTracerProvider(provider);
+    langfuseInitialized = true;
+    console.log("Langfuse OTel tracing initialized");
+    return true;
+  } catch (err) {
+    console.warn("Failed to initialize Langfuse OTel:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
 
-    if (isPlaceholderKey(secretKey) || isPlaceholderKey(publicKey)) {
-      console.warn("Langfuse keys contain placeholders — observability disabled. Add real keys to .env");
-      return [];
-    }
+export function getLangfuseCallbacks(sessionId?: string): unknown[] {
+  if (!langfuseInitialized) return [];
 
+  try {
     const { CallbackHandler } = require("@langfuse/langchain");
     return [
       new CallbackHandler({
-        secretKey,
-        publicKey,
-        baseUrl: process.env.LANGFUSE_BASE_URL || process.env.LANGFUSE_HOST || "https://cloud.langfuse.com",
         sessionId: sessionId || "default",
         tags: ["agentforge"],
       }),

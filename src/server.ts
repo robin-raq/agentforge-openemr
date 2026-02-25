@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { chat } from "./agent";
-import { PORT, getLangfuseCallbacks } from "./config";
+import { PORT, getLangfuseCallbacks, initLangfuse } from "./config";
 
 function getOpenEmrOrigins(): string | undefined {
   const val = process.env.OPENEMR_ORIGINS;
@@ -116,6 +116,13 @@ export function createApp(): express.Express {
 
       const result = await chat(effectiveMessage, sessionId, history, callbacks);
 
+      // Flush Langfuse traces before responding
+      for (const cb of callbacks) {
+        if (cb && typeof (cb as any).flushAsync === "function") {
+          await (cb as any).flushAsync();
+        }
+      }
+
       // chat() mutates history with user + assistant messages
       setSessionHistory(sessionId, history);
       evictOldSessions();
@@ -150,6 +157,7 @@ export function createApp(): express.Express {
 
 // Only start listening when run directly (not imported by tests)
 if (!process.env.VITEST) {
+  initLangfuse();
   const app = createApp();
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`OpenEMR Clinical Query Agent running on http://localhost:${PORT}`);
