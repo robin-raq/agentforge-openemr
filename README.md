@@ -59,6 +59,8 @@ npx tsx eval/run-eval.ts
 
 ![Eval Results](docs/eval-results.gif)
 
+![Eval Harness](docs/mvp-05-eval-harness.gif)
+
 | Category | Result |
 |----------|--------|
 | **Golden Sets** | 10/10 (100%) |
