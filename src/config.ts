@@ -84,9 +84,11 @@ export function getLangfuseCallbacks(sessionId?: string): unknown[] {
     const { CallbackHandler } = require("@langfuse/langchain");
     return [
       new CallbackHandler({
+        secretKey,
+        publicKey,
+        baseUrl: process.env.LANGFUSE_BASE_URL || process.env.LANGFUSE_HOST || "https://cloud.langfuse.com",
         sessionId: sessionId || "default",
         tags: ["agentforge"],
-        baseUrl: process.env.LANGFUSE_HOST || "https://cloud.langfuse.com",
       }),
     ];
   } catch {
