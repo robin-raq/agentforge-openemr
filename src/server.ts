@@ -2,7 +2,8 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { chat } from "./agent";
-import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls } from "./config";
+import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls, getDataSource } from "./config";
+import type { DataSource } from "./data/datasource";
 
 function getOpenEmrOrigins(): string | undefined {
   const val = process.env.OPENEMR_ORIGINS;
@@ -65,8 +66,18 @@ function rateLimit(sessionId: string): boolean {
   return rateLimitMap[sessionId].count <= RATE_LIMIT_PER_MINUTE;
 }
 
+let appDataSource: DataSource | null = null;
+
+export function getDataSourceForApp(): DataSource {
+  if (!appDataSource) {
+    appDataSource = getDataSource();
+  }
+  return appDataSource;
+}
+
 export function createApp(): express.Express {
   const app = express();
+  const dataSource = getDataSourceForApp();
   const allowedOrigins = getAllowedOrigins();
   if (allowedOrigins.length > 0) {
     app.use(cors({ origin: allowedOrigins, credentials: true }));
@@ -167,6 +178,34 @@ export function createApp(): express.Express {
     }
     console.log("Feedback received:", { session_id, message_index, rating, comment });
     res.json({ status: "ok" });
+  });
+
+  // Document CRUD endpoints
+  app.post("/api/documents/:id/finalize", async (req, res) => {
+    try {
+      const doc = await dataSource.updateDocument(req.params.id, { status: "final" });
+      res.json({ success: true, document: doc, message: "Document finalized and saved to chart." });
+    } catch {
+      res.status(404).json({ error: "Document not found or already finalized." });
+    }
+  });
+
+  app.get("/api/documents/:id", async (req, res) => {
+    try {
+      const doc = await dataSource.getDocument(req.params.id);
+      res.json(doc);
+    } catch {
+      res.status(404).json({ error: "Document not found." });
+    }
+  });
+
+  app.delete("/api/documents/:id", async (req, res) => {
+    try {
+      const result = await dataSource.deleteDocument(req.params.id);
+      res.json(result);
+    } catch {
+      res.status(404).json({ error: "Document not found." });
+    }
   });
 
   app.use(express.static(path.join(__dirname, "../public")));

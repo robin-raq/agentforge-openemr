@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
 
-import { createApp, setSessionHistory } from "../src/server";
+import { createApp, setSessionHistory, getDataSourceForApp } from "../src/server";
 
 const originalEnv = { ...process.env };
 
@@ -199,6 +199,73 @@ describe("server", () => {
       // Full capacity testing is impractical in unit tests (would need 1001 entries).
       evictOldSessions();
       expect(getSessionCount()).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("document endpoints", () => {
+    it("POST /api/documents/:id/finalize returns 200 for valid draft", async () => {
+      // First, save a document via the datasource directly
+      const ds = getDataSourceForApp();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Test summary",
+        created_by: "ai-agent",
+      });
+      const res = await makeRequest(app, "POST", `/api/documents/${doc.document_id}/finalize`);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.document.status).toBe("final");
+    });
+
+    it("POST /api/documents/:id/finalize returns 404 for unknown ID", async () => {
+      const res = await makeRequest(app, "POST", "/api/documents/doc-nonexistent/finalize");
+      expect(res.status).toBe(404);
+    });
+
+    it("GET /api/documents/:id returns saved document", async () => {
+      const ds = getDataSourceForApp();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Retrieve me",
+        created_by: "ai-agent",
+      });
+      const res = await makeRequest(app, "GET", `/api/documents/${doc.document_id}`);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.content).toBe("Retrieve me");
+    });
+
+    it("GET /api/documents/:id returns 404 for unknown ID", async () => {
+      const res = await makeRequest(app, "GET", "/api/documents/doc-nonexistent");
+      expect(res.status).toBe(404);
+    });
+
+    it("DELETE /api/documents/:id deletes the document", async () => {
+      const ds = getDataSourceForApp();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Delete me",
+        created_by: "ai-agent",
+      });
+      const res = await makeRequest(app, "DELETE", `/api/documents/${doc.document_id}`);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.deleted).toBe(true);
+    });
+
+    it("DELETE /api/documents/:id returns 404 for unknown ID", async () => {
+      const res = await makeRequest(app, "DELETE", "/api/documents/doc-nonexistent");
+      expect(res.status).toBe(404);
     });
   });
 });
