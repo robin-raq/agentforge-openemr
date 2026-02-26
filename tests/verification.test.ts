@@ -93,5 +93,150 @@ describe("verification", () => {
       const result = applyVerification("General response.", []);
       expect(result.response).toContain("Sources:");
     });
+
+    it("cites OpenEMR for new bounty tools", () => {
+      const result = applyVerification("Encounter data.", [
+        {
+          name: "get_encounter_data",
+          args: { patient_id: "1" },
+          result: JSON.stringify({ encounters: [] }),
+        },
+      ]);
+      expect(result.response).toContain("OpenEMR Patient Records");
+    });
+  });
+
+  describe("medication reconciliation verification", () => {
+    it("adds safety alert for modified medications", () => {
+      const result = applyVerification("Med rec complete.", [
+        {
+          name: "reconcile_medications",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            reconciliation: {
+              modified: [
+                {
+                  name: "Lisinopril",
+                  dose: "20mg",
+                  frequency: "daily",
+                  original_dose: "10mg",
+                  original_frequency: "daily",
+                  modification_reason: "BP control",
+                },
+              ],
+              new_medications: [],
+              discontinued: [],
+            },
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("MEDICATION CHANGE"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("Lisinopril"))).toBe(true);
+    });
+
+    it("adds safety alert for new medications", () => {
+      const result = applyVerification("New meds added.", [
+        {
+          name: "reconcile_medications",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            reconciliation: {
+              modified: [],
+              new_medications: [
+                {
+                  name: "Amlodipine",
+                  dose: "5mg",
+                  frequency: "daily",
+                  modification_reason: "BP control",
+                },
+              ],
+              discontinued: [],
+            },
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("NEW MEDICATION"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("Amlodipine"))).toBe(true);
+    });
+
+    it("adds safety alert for discontinued medications", () => {
+      const result = applyVerification("Med discontinued.", [
+        {
+          name: "reconcile_medications",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            reconciliation: {
+              modified: [],
+              new_medications: [],
+              discontinued: [
+                {
+                  name: "Aspirin",
+                  modification_reason: "Bleeding risk with warfarin",
+                },
+              ],
+            },
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("DISCONTINUED"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("Aspirin"))).toBe(true);
+    });
+
+    it("no alerts when all medications are continued unchanged", () => {
+      const result = applyVerification("No changes.", [
+        {
+          name: "reconcile_medications",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            reconciliation: {
+              modified: [],
+              new_medications: [],
+              discontinued: [],
+            },
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts).toHaveLength(0);
+    });
+  });
+
+  describe("discharge summary verification", () => {
+    it("adds critical lab alert from discharge summary data", () => {
+      const result = applyVerification("Summary drafted.", [
+        {
+          name: "draft_discharge_summary",
+          args: { patient_id: "4", encounter_id: "enc-401" },
+          result: JSON.stringify({
+            safety_flags: { has_critical_labs: true },
+            labs_at_discharge: {
+              critical: [
+                {
+                  test_name: "INR",
+                  value: 3.8,
+                  unit: "",
+                  reference_range: "2.0-3.0",
+                },
+              ],
+            },
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("CRITICAL LAB AT DISCHARGE"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("INR"))).toBe(true);
+    });
+
+    it("adds draft saved confirmation for save_to_chart", () => {
+      const result = applyVerification("Saved.", [
+        {
+          name: "save_to_chart",
+          args: {},
+          result: JSON.stringify({
+            success: true,
+            document_id: "doc-1",
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("DRAFT SAVED"))).toBe(true);
+    });
   });
 });

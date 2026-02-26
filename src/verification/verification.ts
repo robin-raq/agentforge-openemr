@@ -6,6 +6,10 @@ const PATIENT_TOOLS = new Set([
   "get_medications",
   "allergy_check",
   "get_lab_results",
+  "get_encounter_data",
+  "reconcile_medications",
+  "draft_discharge_summary",
+  "save_to_chart",
 ]);
 const FDA_TOOLS = new Set(["drug_interaction_check"]);
 
@@ -85,6 +89,63 @@ export function applyVerification(
               );
             }
           }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    if (tc.name === "reconcile_medications" && tc.result) {
+      try {
+        const data = JSON.parse(tc.result);
+        if (data.reconciliation?.modified?.length > 0) {
+          for (const med of data.reconciliation.modified) {
+            safetyAlerts.push(
+              `⚠️ MEDICATION CHANGE: ${med.name} changed from ${med.original_dose} ${med.original_frequency} to ${med.dose} ${med.frequency} — ${med.modification_reason}`
+            );
+          }
+        }
+        if (data.reconciliation?.new_medications?.length > 0) {
+          for (const med of data.reconciliation.new_medications) {
+            safetyAlerts.push(
+              `⚠️ NEW MEDICATION: ${med.name} ${med.dose} ${med.frequency} — ${med.modification_reason}`
+            );
+          }
+        }
+        if (data.reconciliation?.discontinued?.length > 0) {
+          for (const med of data.reconciliation.discontinued) {
+            safetyAlerts.push(
+              `⚠️ DISCONTINUED: ${med.name} — ${med.modification_reason}`
+            );
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    if (tc.name === "draft_discharge_summary" && tc.result) {
+      try {
+        const data = JSON.parse(tc.result);
+        if (data.safety_flags?.has_critical_labs && data.labs_at_discharge?.critical) {
+          for (const lab of data.labs_at_discharge.critical) {
+            safetyAlerts.push(
+              `⚠️ CRITICAL LAB AT DISCHARGE: ${lab.test_name} = ${lab.value} ${lab.unit} (ref: ${lab.reference_range})`
+            );
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    if (tc.name === "save_to_chart" && tc.result) {
+      try {
+        const data = JSON.parse(tc.result);
+        if (data.success) {
+          safetyAlerts.push(
+            `📋 DRAFT SAVED: Document ${data.document_id} saved as draft. Clinician review required before finalizing.`
+          );
         }
       } catch {
         // Ignore parse errors
