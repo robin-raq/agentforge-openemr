@@ -106,5 +106,86 @@
       { "test_name": "ALT", "value": 45, "unit": "U/L", "reference_range": "7-56", "date": "2024-01-10", "flag": "normal" },
       { "test_name": "Total Cholesterol", "value": 245, "unit": "mg/dL", "reference_range": "<200", "date": "2024-01-08", "flag": "abnormal" }
     ]
-  }
+  },
+  "encounters": {
+    "1": [
+      {
+        "encounter_id": "enc-101",
+        "patient_id": "1",
+        "type": "inpatient",
+        "admission_date": "2024-01-05",
+        "discharge_date": "2024-01-10",
+        "status": "discharged",
+        "attending_provider": "Dr. Smith",
+        "admission_reason": "Atrial fibrillation with rapid ventricular response",
+        "diagnoses": [
+          "Atrial Fibrillation with RVR",
+          "Hypertension - uncontrolled",
+          "Type 2 Diabetes - hyperglycemia"
+        ],
+        "procedures": [
+          "Transthoracic echocardiogram",
+          "Continuous telemetry monitoring"
+        ],
+        "hospital_course_notes": [
+          "Day 1: Admitted via ED with HR 142, started IV diltiazem drip. BP 178/96.",
+          "Day 2: Rate controlled to 84 bpm. Transitioned to oral metoprolol. Warfarin held, bridged with heparin.",
+          "Day 3: Echo shows EF 50%, no structural abnormalities. HbA1c 7.2, increased Metformin dose.",
+          "Day 4: Resumed warfarin at 5mg. INR 2.5 on day of discharge.",
+          "Day 5: Stable for discharge. BP 138/86 on adjusted Lisinopril 20mg (was 10mg)."
+        ]
+      }
+    ],
+    "2": [],
+    "3": [],
+    "4": [
+      {
+        "encounter_id": "enc-401",
+        "patient_id": "4",
+        "type": "inpatient",
+        "admission_date": "2024-01-08",
+        "status": "active",
+        "attending_provider": "Dr. Smith",
+        "admission_reason": "Hypertensive emergency with acute kidney injury",
+        "diagnoses": [
+          "Hypertensive emergency",
+          "Acute kidney injury (Cr 1.8 from baseline 1.1)",
+          "Atrial fibrillation - rate uncontrolled",
+          "Type 2 Diabetes - poor control (HbA1c 8.9%)",
+          "Supratherapeutic INR (3.8)"
+        ],
+        "procedures": [
+          "IV labetalol infusion",
+          "IV insulin drip",
+          "Continuous telemetry monitoring",
+          "Renal ultrasound"
+        ],
+        "hospital_course_notes": [
+          "Day 1: Admitted from clinic with BP 168/98, SpO2 93%. Started IV labetalol. Warfarin held due to INR 3.8. Vitamin K 2.5mg PO given.",
+          "Day 2: BP improved to 152/88. Transitioned to PO labetalol. Cr trending down to 1.6. Started IV insulin for glucose 320.",
+          "Day 3: Renal US normal. Cr 1.5. INR 2.8. Resumed warfarin at reduced dose 3mg. Transitioned to subQ insulin.",
+          "Day 4: BP 140/82. Cr 1.3. Adjusted Lisinopril from 20mg to 10mg due to AKI. Added amlodipine 5mg. Glucose 180 on Metformin + glipizide.",
+          "Day 5: Stable. SpO2 97% on RA. INR 2.4. Cr 1.2. Plan discharge tomorrow if labs stable."
+        ]
+      }
+    ]
+  },
+  "admission_medications": {
+    "enc-101": [
+      { "name": "Warfarin", "dose": "5mg", "frequency": "daily", "status": "continued" },
+      { "name": "Lisinopril", "dose": "20mg", "frequency": "daily", "status": "modified", "modification_reason": "Increased from 10mg for better BP control", "original_dose": "10mg", "original_frequency": "daily" },
+      { "name": "Metformin", "dose": "1000mg", "frequency": "twice daily", "status": "modified", "modification_reason": "Increased from 500mg due to HbA1c 7.2", "original_dose": "500mg", "original_frequency": "twice daily" },
+      { "name": "Metoprolol", "dose": "25mg", "frequency": "twice daily", "status": "new", "modification_reason": "Added for rate control of atrial fibrillation" }
+    ],
+    "enc-401": [
+      { "name": "Warfarin", "dose": "3mg", "frequency": "daily", "status": "modified", "modification_reason": "Reduced from 5mg due to supratherapeutic INR 3.8", "original_dose": "5mg", "original_frequency": "daily" },
+      { "name": "Metformin", "dose": "1000mg", "frequency": "twice daily", "status": "continued" },
+      { "name": "Lisinopril", "dose": "10mg", "frequency": "daily", "status": "modified", "modification_reason": "Reduced from 20mg due to acute kidney injury", "original_dose": "20mg", "original_frequency": "daily" },
+      { "name": "Atorvastatin", "dose": "40mg", "frequency": "daily", "status": "continued" },
+      { "name": "Omeprazole", "dose": "20mg", "frequency": "daily", "status": "continued" },
+      { "name": "Amlodipine", "dose": "5mg", "frequency": "daily", "status": "new", "modification_reason": "Added for blood pressure control" },
+      { "name": "Glipizide", "dose": "5mg", "frequency": "twice daily", "status": "new", "modification_reason": "Added for improved glycemic control" }
+    ]
+  },
+  "documents": {}
 }
