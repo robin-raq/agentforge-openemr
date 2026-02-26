@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
 
-import { createApp } from "../src/server";
+import { createApp, setSessionHistory } from "../src/server";
 
 const originalEnv = { ...process.env };
 
@@ -144,6 +144,33 @@ describe("server", () => {
       });
       // Should not be a validation error — bad patient_id is silently ignored
       expect(res.status).not.toBe(400);
+    });
+  });
+
+  describe("feedback endpoint", () => {
+    it("rejects feedback with missing session_id", async () => {
+      const res = await makeRequest(app, "POST", "/api/feedback", {
+        rating: "positive",
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects feedback for unknown session", async () => {
+      const res = await makeRequest(app, "POST", "/api/feedback", {
+        session_id: "nonexistent-session",
+        rating: "positive",
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("accepts feedback for active session", async () => {
+      const sid = "feedback-test-" + Date.now();
+      setSessionHistory(sid, [{ role: "user", content: "hello" }]);
+      const res = await makeRequest(app, "POST", "/api/feedback", {
+        session_id: sid,
+        rating: "positive",
+      });
+      expect(res.status).toBe(200);
     });
   });
 

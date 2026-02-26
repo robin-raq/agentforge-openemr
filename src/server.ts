@@ -157,6 +157,14 @@ export function createApp(): express.Express {
   // Feedback endpoint
   app.post("/api/feedback", (req, res) => {
     const { session_id, message_index, rating, comment } = req.body;
+    if (!session_id || typeof session_id !== "string") {
+      res.status(400).json({ error: "session_id is required" });
+      return;
+    }
+    if (!sessionHistory.has(session_id)) {
+      res.status(404).json({ error: "Unknown session" });
+      return;
+    }
     console.log("Feedback received:", { session_id, message_index, rating, comment });
     res.json({ status: "ok" });
   });
