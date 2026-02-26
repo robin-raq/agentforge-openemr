@@ -23,7 +23,10 @@ function deriveFhirUrls(baseUrl: string): {
   };
 }
 
+let cachedDataSource: DataSource | null = null;
+
 export function getDataSource(): DataSource {
+  if (cachedDataSource) return cachedDataSource;
   const source = process.env.DATA_SOURCE || "mock";
   if (source === "fhir") {
     const baseUrl = process.env.FHIR_BASE_URL;
@@ -39,7 +42,7 @@ export function getDataSource(): DataSource {
 
     const { fhirBaseUrl, apiBaseUrl, tokenUrl } = deriveFhirUrls(baseUrl);
 
-    return new FhirDataSource({
+    cachedDataSource = new FhirDataSource({
       fhirBaseUrl,
       apiBaseUrl,
       tokenUrl,
@@ -49,8 +52,10 @@ export function getDataSource(): DataSource {
       password,
       scope: process.env.FHIR_SCOPE,
     });
+    return cachedDataSource;
   }
-  return new MockDataSource();
+  cachedDataSource = new MockDataSource();
+  return cachedDataSource;
 }
 
 function isPlaceholderKey(key: string): boolean {

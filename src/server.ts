@@ -66,18 +66,9 @@ function rateLimit(sessionId: string): boolean {
   return rateLimitMap[sessionId].count <= RATE_LIMIT_PER_MINUTE;
 }
 
-let appDataSource: DataSource | null = null;
-
-export function getDataSourceForApp(): DataSource {
-  if (!appDataSource) {
-    appDataSource = getDataSource();
-  }
-  return appDataSource;
-}
-
 export function createApp(): express.Express {
   const app = express();
-  const dataSource = getDataSourceForApp();
+  const dataSource = getDataSource();
   const allowedOrigins = getAllowedOrigins();
   if (allowedOrigins.length > 0) {
     app.use(cors({ origin: allowedOrigins, credentials: true }));
@@ -96,7 +87,7 @@ export function createApp(): express.Express {
     }
     res.setHeader(
       "Content-Security-Policy",
-      `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; ${framePolicy}`
+      `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; ${framePolicy}`
     );
     next();
   });

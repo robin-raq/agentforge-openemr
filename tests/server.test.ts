@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
 
-import { createApp, setSessionHistory, getDataSourceForApp } from "../src/server";
+import { createApp, setSessionHistory } from "../src/server";
+import { getDataSource } from "../src/config";
 
 const originalEnv = { ...process.env };
 
@@ -205,7 +206,7 @@ describe("server", () => {
   describe("document endpoints", () => {
     it("POST /api/documents/:id/finalize returns 200 for valid draft", async () => {
       // First, save a document via the datasource directly
-      const ds = getDataSourceForApp();
+      const ds = getDataSource();
       const doc = await ds.saveDocument({
         patient_id: "1",
         encounter_id: "enc-101",
@@ -227,7 +228,7 @@ describe("server", () => {
     });
 
     it("GET /api/documents/:id returns saved document", async () => {
-      const ds = getDataSourceForApp();
+      const ds = getDataSource();
       const doc = await ds.saveDocument({
         patient_id: "1",
         encounter_id: "enc-101",
@@ -248,7 +249,7 @@ describe("server", () => {
     });
 
     it("DELETE /api/documents/:id deletes the document", async () => {
-      const ds = getDataSourceForApp();
+      const ds = getDataSource();
       const doc = await ds.saveDocument({
         patient_id: "1",
         encounter_id: "enc-101",
