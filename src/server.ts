@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { chat } from "./agent";
-import { PORT, getLangfuseCallbacks, initLangfuse } from "./config";
+import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls } from "./config";
 
 function getOpenEmrOrigins(): string | undefined {
   const val = process.env.OPENEMR_ORIGINS;
@@ -179,6 +179,7 @@ export function createApp(): express.Express {
 
 // Only start listening when run directly (not imported by tests)
 if (!process.env.VITEST) {
+  warnInsecureTls();
   initLangfuse();
   const app = createApp();
   app.listen(PORT, "0.0.0.0", () => {

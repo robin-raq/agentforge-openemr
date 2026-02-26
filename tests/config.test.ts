@@ -111,4 +111,26 @@ describe("config", () => {
       expect(() => getDataSource()).toThrow("FHIR datasource requires");
     });
   });
+
+  describe("warnInsecureTls", () => {
+    it("logs warning when NODE_TLS_REJECT_UNAUTHORIZED is 0", async () => {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { warnInsecureTls } = await import("../src/config");
+      warnInsecureTls();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("TLS")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("does not log when NODE_TLS_REJECT_UNAUTHORIZED is not 0", async () => {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "1";
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { warnInsecureTls } = await import("../src/config");
+      warnInsecureTls();
+      expect(consoleSpy).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
 });

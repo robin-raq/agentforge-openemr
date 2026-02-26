@@ -115,3 +115,11 @@ export function getLangfuseCallbacks(sessionId?: string): unknown[] {
   }
   return [];
 }
+
+export function warnInsecureTls(): void {
+  if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
+    console.warn(
+      "WARNING: NODE_TLS_REJECT_UNAUTHORIZED=0 — TLS certificate verification is disabled. Do not use in production."
+    );
+  }
+}
