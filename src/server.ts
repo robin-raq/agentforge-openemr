@@ -85,7 +85,7 @@ export function createApp(): express.Express {
     }
     res.setHeader(
       "Content-Security-Policy",
-      `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; ${framePolicy}`
+      `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; ${framePolicy}`
     );
     next();
   });
