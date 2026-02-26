@@ -77,11 +77,16 @@ export function createApp(): express.Express {
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     const openEmrOrigins = getOpenEmrOrigins();
-    if (openEmrOrigins) {
-      res.setHeader("Content-Security-Policy", `frame-ancestors ${openEmrOrigins}`);
-    } else {
+    const framePolicy = openEmrOrigins
+      ? `frame-ancestors ${openEmrOrigins}`
+      : "frame-ancestors 'none'";
+    if (!openEmrOrigins) {
       res.setHeader("X-Frame-Options", "DENY");
     }
+    res.setHeader(
+      "Content-Security-Policy",
+      `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; ${framePolicy}`
+    );
     next();
   });
 

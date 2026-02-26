@@ -80,6 +80,14 @@ describe("server", () => {
       }
     });
 
+    it("sets Content-Security-Policy with script-src and style-src", async () => {
+      const res = await makeRequest(app, "GET", "/api/health");
+      const csp = res.headers["content-security-policy"];
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("script-src 'self'");
+      expect(csp).toContain("style-src 'self'");
+    });
+
     it("sets X-Frame-Options: DENY when OPENEMR_ORIGINS not set", async () => {
       const prev = process.env.OPENEMR_ORIGINS;
       delete process.env.OPENEMR_ORIGINS;
