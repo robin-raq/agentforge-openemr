@@ -677,5 +677,50 @@
     "category": "bounty_workflow",
     "subcategory": "med_rec_save",
     "difficulty": "hard"
+  },
+
+  {
+    "id": "di-001",
+    "query": "Generate discharge instructions in plain language for patient 1",
+    "patient_id": "1",
+    "expected_tools": ["get_encounter_data", "generate_discharge_instructions"],
+    "must_contain": ["Metoprolol", "Lisinopril", "warning"],
+    "must_not_contain": ["error", "not found"],
+    "category": "bounty_discharge_instructions",
+    "subcategory": "basic_instructions",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "di-002",
+    "query": "In layman's terms, describe follow-up care for patient 4's condition including medication changes",
+    "patient_id": "4",
+    "expected_tools": ["get_encounter_data", "generate_discharge_instructions"],
+    "must_contain": ["Amlodipine", "Glipizide"],
+    "must_not_contain": ["error"],
+    "category": "bounty_discharge_instructions",
+    "subcategory": "complex_med_changes",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "di-003",
+    "query": "What should patient 1 know about their medications when going home from the hospital?",
+    "patient_id": "1",
+    "expected_tools": ["get_encounter_data", "generate_discharge_instructions"],
+    "must_contain": ["medication"],
+    "must_not_contain": ["error", "not found"],
+    "category": "bounty_discharge_instructions",
+    "subcategory": "natural_language_query",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "di-004",
+    "query": "Generate discharge instructions for patient 2",
+    "patient_id": "2",
+    "expected_tools": ["get_encounter_data"],
+    "must_contain": ["no encounter"],
+    "must_not_contain": ["discharge instructions for", "medication"],
+    "category": "bounty_discharge_instructions",
+    "subcategory": "no_encounter_edge",
+    "difficulty": "straightforward"
   }
 ]

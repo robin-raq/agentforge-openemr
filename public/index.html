@@ -320,13 +320,14 @@
     <button class="quick-btn" data-prompt="What are the latest lab results for patient {pid}?">Lab Results</button>
     <button class="quick-btn" data-prompt="Does patient {pid} have any allergies to amoxicillin?">Allergy Check</button>
     <button class="quick-btn" data-prompt="Draft a discharge summary for patient {pid}">Discharge Summary</button>
+    <button class="quick-btn" data-prompt="Generate discharge instructions in plain language for patient {pid}">Discharge Instructions</button>
     <button class="quick-btn" data-prompt="Reconcile medications for patient {pid}">Med Reconciliation</button>
   </div>
 
   <div id="chat-container">
     <div class="welcome">
       <h2>OpenEMR Clinical Query Agent</h2>
-      <p>Ask questions about patient data, medications, drug interactions, allergies, lab results, discharge summaries, and medication reconciliation. Select a patient above or mention one by ID.</p>
+      <p>Ask questions about patient data, medications, drug interactions, allergies, lab results, discharge summaries, discharge instructions, and medication reconciliation. Select a patient above or mention one by ID.</p>
     </div>
   </div>
 
@@ -367,6 +368,7 @@
       get_encounter_data: '\u{1F3E5}',
       reconcile_medications: '\u{1F4CB}',
       draft_discharge_summary: '\u{1F4DD}',
+      generate_discharge_instructions: '\u{1F4C4}',
       save_to_chart: '\u{1F4BE}'
     };
     const TOOL_LABELS = {
@@ -378,6 +380,7 @@
       get_encounter_data: 'Encounter Data',
       reconcile_medications: 'Med Reconciliation',
       draft_discharge_summary: 'Discharge Summary',
+      generate_discharge_instructions: 'Discharge Instructions',
       save_to_chart: 'Save to Chart'
     };
 

@@ -63,7 +63,7 @@ export interface DocumentRecord {
   document_id: string;
   patient_id: string;
   encounter_id: string;
-  type: "discharge_summary" | "medication_reconciliation";
+  type: "discharge_summary" | "medication_reconciliation" | "discharge_instructions";
   status: "draft" | "final";
   content: string;
   created_at: string;

@@ -9,9 +9,11 @@ const PATIENT_TOOLS = new Set([
   "get_encounter_data",
   "reconcile_medications",
   "draft_discharge_summary",
+  "generate_discharge_instructions",
   "save_to_chart",
 ]);
 const FDA_TOOLS = new Set(["drug_interaction_check"]);
+const DAILYMED_TOOLS = new Set(["generate_discharge_instructions"]);
 
 function buildSourceCitation(
   toolCalls: Array<{ name: string; args: unknown; result?: string }>
@@ -20,9 +22,11 @@ function buildSourceCitation(
 
   const usedPatientTool = toolCalls.some((tc) => PATIENT_TOOLS.has(tc.name));
   const usedFdaTool = toolCalls.some((tc) => FDA_TOOLS.has(tc.name));
+  const usedDailyMedTool = toolCalls.some((tc) => DAILYMED_TOOLS.has(tc.name));
 
   if (usedPatientTool) sources.push("OpenEMR Patient Records");
   if (usedFdaTool) sources.push("OpenFDA");
+  if (usedDailyMedTool) sources.push("DailyMed (NLM/NIH)");
 
   if (sources.length === 0) {
     return "\n\nSources: Clinical knowledge base";
@@ -139,6 +143,35 @@ export function applyVerification(
       }
     }
 
+    if (tc.name === "generate_discharge_instructions" && tc.result) {
+      try {
+        const data = JSON.parse(tc.result);
+        if (data.new_medications?.length > 0) {
+          for (const med of data.new_medications) {
+            safetyAlerts.push(
+              `⚠️ NEW MEDICATION FOR PATIENT: ${med.name} ${med.dose} ${med.frequency} — ${med.reason}`
+            );
+          }
+        }
+        if (data.modified_medications?.length > 0) {
+          for (const med of data.modified_medications) {
+            safetyAlerts.push(
+              `⚠️ MEDICATION DOSE CHANGED: ${med.name} changed from ${med.previous_dose} to ${med.new_dose} — ${med.reason}`
+            );
+          }
+        }
+        if (data.discontinued_medications?.length > 0) {
+          for (const med of data.discontinued_medications) {
+            safetyAlerts.push(
+              `⚠️ MEDICATION STOPPED: ${med.name} — ${med.reason}`
+            );
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
     if (tc.name === "save_to_chart" && tc.result) {
       try {
         const data = JSON.parse(tc.result);
@@ -154,9 +187,8 @@ export function applyVerification(
   }
 
   let finalResponse = response;
-  if (safetyAlerts.length > 0) {
-    finalResponse = safetyAlerts.join("\n\n") + "\n\n" + finalResponse;
-  }
+  // Safety alerts are returned separately in safetyAlerts array
+  // and rendered as yellow banners by the UI — don't prepend to response text
   finalResponse += buildSourceCitation(toolCalls) + MEDICAL_DISCLAIMER;
 
   return {

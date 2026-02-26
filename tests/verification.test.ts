@@ -19,9 +19,11 @@ describe("verification", () => {
         }),
       },
     ]);
-    expect(result.response).toContain("⚠️ SAFETY ALERT");
-    expect(result.response).toContain("bleeding");
     expect(result.safetyAlerts).toHaveLength(1);
+    expect(result.safetyAlerts[0]).toContain("SAFETY ALERT");
+    expect(result.safetyAlerts[0]).toContain("bleeding");
+    // Alerts should NOT be in the response text (UI renders them as separate banners)
+    expect(result.response).not.toContain("⚠️ SAFETY ALERT");
   });
 
   it("adds source citation to every response", () => {
@@ -237,6 +239,108 @@ describe("verification", () => {
         },
       ]);
       expect(result.safetyAlerts.some((a) => a.includes("DRAFT SAVED"))).toBe(true);
+    });
+  });
+
+  describe("discharge instructions verification", () => {
+    it("adds alert for new patient medications", () => {
+      const result = applyVerification("Instructions generated.", [
+        {
+          name: "generate_discharge_instructions",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            new_medications: [
+              {
+                name: "Metoprolol",
+                dose: "25mg",
+                frequency: "twice daily",
+                reason: "Heart rate control for atrial fibrillation",
+              },
+            ],
+            modified_medications: [],
+            discontinued_medications: [],
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("NEW MEDICATION FOR PATIENT"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("Metoprolol"))).toBe(true);
+    });
+
+    it("adds alert for changed medication doses", () => {
+      const result = applyVerification("Instructions generated.", [
+        {
+          name: "generate_discharge_instructions",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            new_medications: [],
+            modified_medications: [
+              {
+                name: "Lisinopril",
+                previous_dose: "10mg",
+                new_dose: "20mg",
+                reason: "Blood pressure not at target",
+              },
+            ],
+            discontinued_medications: [],
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("MEDICATION DOSE CHANGED"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("Lisinopril"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("10mg"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("20mg"))).toBe(true);
+    });
+
+    it("adds alert for stopped medications", () => {
+      const result = applyVerification("Instructions generated.", [
+        {
+          name: "generate_discharge_instructions",
+          args: { patient_id: "4", encounter_id: "enc-401" },
+          result: JSON.stringify({
+            new_medications: [],
+            modified_medications: [],
+            discontinued_medications: [
+              {
+                name: "Metformin",
+                reason: "Renal function decline",
+              },
+            ],
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts.some((a) => a.includes("MEDICATION STOPPED"))).toBe(true);
+      expect(result.safetyAlerts.some((a) => a.includes("Metformin"))).toBe(true);
+    });
+
+    it("no alerts when only continued medications", () => {
+      const result = applyVerification("Instructions generated.", [
+        {
+          name: "generate_discharge_instructions",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            new_medications: [],
+            modified_medications: [],
+            discontinued_medications: [],
+          }),
+        },
+      ]);
+      expect(result.safetyAlerts).toHaveLength(0);
+    });
+
+    it("cites DailyMed source when discharge instructions tool used", () => {
+      const result = applyVerification("Instructions generated.", [
+        {
+          name: "generate_discharge_instructions",
+          args: { patient_id: "1", encounter_id: "enc-101" },
+          result: JSON.stringify({
+            new_medications: [],
+            modified_medications: [],
+            discontinued_medications: [],
+          }),
+        },
+      ]);
+      expect(result.response).toContain("DailyMed (NLM/NIH)");
+      expect(result.response).toContain("OpenEMR Patient Records");
     });
   });
 });

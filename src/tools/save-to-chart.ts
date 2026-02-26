@@ -31,12 +31,12 @@ export function saveToChart(dataSource: DataSource) {
     {
       name: "save_to_chart",
       description:
-        "Save a drafted document (discharge summary or medication reconciliation) to the patient's chart as a draft. The document will require clinician review and approval before being finalized. Use this after drafting a discharge summary or medication reconciliation when the user wants to save it.",
+        "Save a drafted document (discharge summary, medication reconciliation, or discharge instructions) to the patient's chart as a draft. The document will require clinician review and approval before being finalized. Use this after drafting a discharge summary, medication reconciliation, or discharge instructions when the user wants to save it.",
       schema: z.object({
         patient_id: z.string().describe("The patient ID"),
         encounter_id: z.string().describe("The encounter/admission ID"),
         document_type: z
-          .enum(["discharge_summary", "medication_reconciliation"])
+          .enum(["discharge_summary", "medication_reconciliation", "discharge_instructions"])
           .describe("Type of document to save"),
         content: z
           .string()
