@@ -8,6 +8,10 @@ import { getMedications } from "./tools/get-medications";
 import { drugInteractionCheck } from "./tools/drug-interaction-check";
 import { allergyCheck } from "./tools/allergy-check";
 import { getLabResults } from "./tools/lab-results";
+import { getEncounterData } from "./tools/get-encounter-data";
+import { reconcileMedications } from "./tools/reconcile-medications";
+import { draftDischargeSummary } from "./tools/draft-discharge-summary";
+import { saveToChart } from "./tools/save-to-chart";
 import { applyVerification } from "./verification/verification";
 import { getErrorMessage } from "./utils/errors";
 
@@ -16,7 +20,7 @@ const MAX_HISTORY_MESSAGES = 20;
 
 const SYSTEM_PROMPT = `You are a clinical query assistant for OpenEMR, a healthcare electronic health records system.
 
-You help clinicians look up patient information, review medication lists, check vital signs, check for drug interactions, check allergy cross-reactivity, and review lab results.
+You help clinicians look up patient information, review medication lists, check vital signs, check for drug interactions, check allergy cross-reactivity, review lab results, prepare discharge summaries, and perform medication reconciliation.
 
 RULES:
 - NEVER prescribe medications or recommend specific treatments
@@ -28,13 +32,22 @@ RULES:
 - If you don't have enough information, ask for clarification (e.g., ask for a patient ID)
 - For medical emergencies, always recommend calling emergency services
 - You are a data retrieval and safety checking tool, NOT a medical advisor
+- When drafting a discharge summary, ALWAYS include: patient demographics, admission/discharge dates, admitting diagnosis, hospital course, discharge medications with changes, pending labs, and follow-up instructions
+- When performing medication reconciliation, clearly categorize medications as: continued unchanged, modified (show old vs new dose), newly added, or discontinued
+- When saving to chart, ALWAYS note that it is a DRAFT requiring clinician review
+- NEVER finalize a document — only save drafts that require human review
+- If a user asks for a discharge summary without specifying an encounter ID, first call get_encounter_data to find the encounter, then use the encounter_id
 
 You have access to these tools:
 - get_patient_summary: Look up patient demographics, conditions, medications, allergies, and vital signs
 - get_medications: Get detailed medication list for a patient
 - drug_interaction_check: Check for known interactions between medications
 - allergy_check: Check if a proposed medication conflicts with patient allergies
-- get_lab_results: Get recent lab results for a patient with flagged abnormal/critical values`;
+- get_lab_results: Get recent lab results for a patient with flagged abnormal/critical values
+- get_encounter_data: Look up encounter/admission data including hospital course and diagnoses
+- reconcile_medications: Compare pre-admission vs. discharge medications for a specific encounter
+- draft_discharge_summary: Gather all data to draft a discharge summary for an encounter
+- save_to_chart: Save a drafted document to the patient's chart as a draft (requires clinician review)`;
 
 const prompt = ChatPromptTemplate.fromMessages([
   ["system", SYSTEM_PROMPT],
@@ -51,6 +64,10 @@ function createAgentExecutor() {
     drugInteractionCheck(),
     allergyCheck(dataSource),
     getLabResults(dataSource),
+    getEncounterData(dataSource),
+    reconcileMedications(dataSource),
+    draftDischargeSummary(dataSource),
+    saveToChart(dataSource),
   ];
 
   const llm = new ChatAnthropic({
