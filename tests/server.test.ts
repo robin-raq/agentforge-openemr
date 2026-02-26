@@ -57,6 +57,29 @@ describe("server", () => {
       expect(res.headers["x-content-type-options"]).toBe("nosniff");
     });
 
+    it("does not set Access-Control-Allow-Origin: * by default", async () => {
+      const res = await makeRequest(app, "GET", "/api/health");
+      expect(res.headers["access-control-allow-origin"]).not.toBe("*");
+    });
+
+    it("reflects allowed origin from ALLOWED_ORIGINS env var", async () => {
+      const prev = process.env.ALLOWED_ORIGINS;
+      process.env.ALLOWED_ORIGINS = "https://myapp.example.com";
+      try {
+        vi.resetModules();
+        const { createApp: createAppWithOrigins } = await import("../src/server");
+        const appWithOrigins = createAppWithOrigins();
+        const res = await makeRequest(appWithOrigins, "GET", "/api/health", undefined, {
+          Origin: "https://myapp.example.com",
+        });
+        expect(res.headers["access-control-allow-origin"]).toBe("https://myapp.example.com");
+      } finally {
+        if (prev !== undefined) process.env.ALLOWED_ORIGINS = prev;
+        else delete process.env.ALLOWED_ORIGINS;
+        vi.resetModules();
+      }
+    });
+
     it("sets X-Frame-Options: DENY when OPENEMR_ORIGINS not set", async () => {
       const prev = process.env.OPENEMR_ORIGINS;
       delete process.env.OPENEMR_ORIGINS;
@@ -150,7 +173,8 @@ async function makeRequest(
   app: express.Express,
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  extraHeaders?: Record<string, string>
 ): Promise<{ status: number; body: string; headers: Record<string, string> }> {
   return new Promise((resolve) => {
     const server = app.listen(0, () => {
@@ -160,7 +184,7 @@ async function makeRequest(
 
       const options: RequestInit = {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...extraHeaders },
       };
       if (body) {
         options.body = JSON.stringify(body);

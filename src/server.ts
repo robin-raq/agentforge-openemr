@@ -10,6 +10,12 @@ function getOpenEmrOrigins(): string | undefined {
   return val.trim();
 }
 
+function getAllowedOrigins(): string[] {
+  const val = process.env.ALLOWED_ORIGINS;
+  if (!val || val.trim() === "") return [];
+  return val.split(",").map((o) => o.trim()).filter(Boolean);
+}
+
 type HistoryEntry = { role: "user" | "assistant"; content: string };
 
 const MAX_SESSIONS = 1000;
@@ -61,7 +67,10 @@ function rateLimit(sessionId: string): boolean {
 
 export function createApp(): express.Express {
   const app = express();
-  app.use(cors());
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.length > 0) {
+    app.use(cors({ origin: allowedOrigins, credentials: true }));
+  }
   app.use(express.json({ limit: "50kb" }));
 
   // Security headers
