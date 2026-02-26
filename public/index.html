@@ -317,7 +317,7 @@
   </footer>
 
   <script>
-    const sessionId = 'session-' + Math.random().toString(36).slice(2);
+    const sessionId = 'session-' + crypto.randomUUID();
     const chatContainer = document.getElementById('chat-container');
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
