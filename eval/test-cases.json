@@ -544,5 +544,138 @@
     "category": "complex_query",
     "subcategory": "preoperative_assessment",
     "difficulty": "hard"
+  },
+
+  {
+    "id": "bounty-001",
+    "query": "What encounters does patient 1 have?",
+    "patient_id": "1",
+    "expected_tools": ["get_encounter_data"],
+    "must_contain": ["enc-101", "Atrial Fibrillation"],
+    "must_not_contain": ["no encounters", "not found"],
+    "category": "bounty_encounter",
+    "subcategory": "encounter_lookup",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "bounty-002",
+    "query": "Show me the encounter history for patient 4",
+    "patient_id": "4",
+    "expected_tools": ["get_encounter_data"],
+    "must_contain": ["enc-401", "Hypertensive Emergency"],
+    "must_not_contain": ["no encounters", "not found"],
+    "category": "bounty_encounter",
+    "subcategory": "encounter_lookup",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "bounty-003",
+    "query": "Does patient 2 have any encounter records?",
+    "patient_id": "2",
+    "expected_tools": ["get_encounter_data"],
+    "must_contain": ["no encounter"],
+    "must_not_contain": ["enc-", "admission"],
+    "category": "bounty_encounter",
+    "subcategory": "empty_encounters",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "bounty-004",
+    "query": "Reconcile medications for patient 1's encounter enc-101",
+    "patient_id": "1",
+    "expected_tools": ["reconcile_medications"],
+    "must_contain": ["Lisinopril", "Metformin"],
+    "must_not_contain": ["error", "not found"],
+    "category": "bounty_med_rec",
+    "subcategory": "medication_reconciliation",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "bounty-005",
+    "query": "What medication changes were made during patient 4's hospital stay?",
+    "patient_id": "4",
+    "expected_tools": ["get_encounter_data", "reconcile_medications"],
+    "must_contain": ["modified", "discontinued"],
+    "must_not_contain": ["no changes", "not found"],
+    "category": "bounty_med_rec",
+    "subcategory": "med_changes_review",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "bounty-006",
+    "query": "Draft a discharge summary for patient 1",
+    "patient_id": "1",
+    "expected_tools": ["get_encounter_data", "draft_discharge_summary"],
+    "must_contain": ["discharge", "John Demo"],
+    "must_not_contain": ["error", "not found"],
+    "category": "bounty_discharge",
+    "subcategory": "discharge_summary_draft",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "bounty-007",
+    "query": "Prepare a discharge summary for patient 4's encounter",
+    "patient_id": "4",
+    "expected_tools": ["get_encounter_data", "draft_discharge_summary"],
+    "must_contain": ["Sara Complex", "Hypertensive Emergency"],
+    "must_not_contain": ["error"],
+    "category": "bounty_discharge",
+    "subcategory": "discharge_summary_active",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "bounty-008",
+    "query": "Draft a discharge summary for patient 4 and save it to the chart",
+    "patient_id": "4",
+    "expected_tools": ["get_encounter_data", "draft_discharge_summary", "save_to_chart"],
+    "must_contain": ["draft", "Document ID"],
+    "must_not_contain": ["error"],
+    "category": "bounty_workflow",
+    "subcategory": "draft_and_save",
+    "difficulty": "hard"
+  },
+  {
+    "id": "bounty-009",
+    "query": "Draft a discharge summary for patient 2",
+    "patient_id": "2",
+    "expected_tools": ["get_encounter_data"],
+    "must_contain": ["no encounter"],
+    "must_not_contain": ["discharge summary for", "Document ID"],
+    "category": "bounty_edge",
+    "subcategory": "no_encounter_discharge",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "bounty-010",
+    "query": "Reconcile medications for patient 1 and highlight any safety concerns",
+    "patient_id": "1",
+    "expected_tools": ["get_encounter_data", "reconcile_medications"],
+    "must_contain": ["Metoprolol"],
+    "must_not_contain": ["error", "not found"],
+    "category": "bounty_safety",
+    "subcategory": "med_rec_safety",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "bounty-011",
+    "query": "Does patient 4 have any critical labs that should be flagged in a discharge summary?",
+    "patient_id": "4",
+    "expected_tools": ["get_lab_results"],
+    "must_contain": ["critical", "INR"],
+    "must_not_contain": ["all normal", "no critical"],
+    "category": "bounty_safety",
+    "subcategory": "critical_labs_discharge",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "bounty-012",
+    "query": "Save a medication reconciliation report for patient 1's encounter enc-101 to the chart",
+    "patient_id": "1",
+    "expected_tools": ["reconcile_medications", "save_to_chart"],
+    "must_contain": ["draft", "Document ID"],
+    "must_not_contain": ["error"],
+    "category": "bounty_workflow",
+    "subcategory": "med_rec_save",
+    "difficulty": "hard"
   }
 ]
