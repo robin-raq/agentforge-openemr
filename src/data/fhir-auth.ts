@@ -14,6 +14,13 @@ interface TokenResponse {
   token_type?: string;
 }
 
+/** OpenEMR OAuth scopes — includes Encounter.read + DocumentReference.* for bounty features */
+export const FHIR_SCOPES =
+  "openid api:oemr api:fhir " +
+  "user/Patient.read user/MedicationRequest.read user/Observation.read " +
+  "user/AllergyIntolerance.read user/Condition.read " +
+  "user/Encounter.read user/DocumentReference.read user/DocumentReference.write";
+
 const DEFAULT_EXPIRY_BUFFER_SEC = 60;
 const DEFAULT_EXPIRY_SEC = 3600;
 

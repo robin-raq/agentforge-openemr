@@ -1,6 +1,12 @@
-import type { DataSource, PatientData, MedicationData, LabResult } from "./datasource";
-import { mapFhirPatient, mapFhirMedications, mapFhirLabResults } from "./fhir-mappers";
-import { FhirAuthManager } from "./fhir-auth";
+import type {
+  DataSource, PatientData, MedicationData, LabResult,
+  EncounterData, AdmissionMedication, DocumentRecord,
+} from "./datasource";
+import {
+  mapFhirPatient, mapFhirMedications, mapFhirLabResults,
+  mapFhirEncounters, mapFhirAdmissionMedications,
+} from "./fhir-mappers";
+import { FhirAuthManager, FHIR_SCOPES } from "./fhir-auth";
 import { PatientIdResolver } from "./patient-id-resolver";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,8 +22,7 @@ export interface FhirDataSourceConfig {
   scope?: string;
 }
 
-const DEFAULT_SCOPE =
-  "openid api:oemr api:fhir user/Patient.read user/MedicationRequest.read user/Observation.read user/AllergyIntolerance.read user/Condition.read";
+const DEFAULT_SCOPE = FHIR_SCOPES;
 
 export class FhirDataSource implements DataSource {
   private fhirBaseUrl: string;
@@ -125,5 +130,169 @@ export class FhirDataSource implements DataSource {
     );
 
     return mapFhirLabResults(bundle as Parameters<typeof mapFhirLabResults>[0]);
+  }
+
+  async getEncounters(patientId: string): Promise<EncounterData[]> {
+    const uuid = await this.resolveUuid(patientId);
+
+    const bundle = await this.fhirFetch(
+      `/Encounter?patient=${uuid}&_sort=-date&_count=50`
+    );
+
+    return mapFhirEncounters(patientId, bundle as Parameters<typeof mapFhirEncounters>[1]);
+  }
+
+  async getAdmissionMedications(encounterId: string): Promise<AdmissionMedication[]> {
+    const bundle = await this.fhirFetch(
+      `/MedicationRequest?encounter=${encounterId}&_count=100`
+    );
+
+    return mapFhirAdmissionMedications(bundle as Parameters<typeof mapFhirAdmissionMedications>[0]);
+  }
+
+  // --- Document CRUD via FHIR DocumentReference ---
+  // Note: OpenEMR FHIR DocumentReference support varies by version.
+  // These methods provide the correct FHIR API calls. In practice,
+  // some OpenEMR instances may need the Standard API instead.
+
+  async saveDocument(
+    doc: Omit<DocumentRecord, "document_id" | "created_at">
+  ): Promise<DocumentRecord> {
+    const token = await this.auth.getAccessToken();
+    const now = new Date().toISOString();
+
+    const fhirDoc = {
+      resourceType: "DocumentReference",
+      status: doc.status === "final" ? "current" : "preliminary",
+      type: {
+        coding: [{ system: "http://loinc.org", code: doc.type === "discharge_summary" ? "18842-5" : "11503-0", display: doc.type.replace("_", " ") }],
+      },
+      subject: { reference: `Patient/${doc.patient_id}` },
+      context: { encounter: [{ reference: `Encounter/${doc.encounter_id}` }] },
+      author: [{ display: doc.created_by }],
+      date: now,
+      content: [
+        {
+          attachment: {
+            contentType: "text/plain",
+            data: Buffer.from(doc.content).toString("base64"),
+          },
+        },
+      ],
+    };
+
+    const res = await fetch(`${this.fhirBaseUrl}/DocumentReference`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/fhir+json",
+        Accept: "application/fhir+json",
+      },
+      body: JSON.stringify(fhirDoc),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`FHIR DocumentReference create failed: ${res.status} ${text}`);
+    }
+
+    const created = (await res.json()) as { id?: string };
+    return {
+      document_id: created.id ?? `fhir-doc-${Date.now()}`,
+      patient_id: doc.patient_id,
+      encounter_id: doc.encounter_id,
+      type: doc.type,
+      status: doc.status,
+      content: doc.content,
+      created_at: now,
+      created_by: doc.created_by,
+    };
+  }
+
+  async getDocument(documentId: string): Promise<DocumentRecord> {
+    const resource = await this.fhirFetch<Record<string, unknown>>(
+      `/DocumentReference/${documentId}`
+    );
+
+    const content = (resource as any).content?.[0]?.attachment?.data
+      ? Buffer.from((resource as any).content[0].attachment.data, "base64").toString("utf-8")
+      : "";
+
+    return {
+      document_id: documentId,
+      patient_id: (resource as any).subject?.reference?.replace("Patient/", "") ?? "",
+      encounter_id: (resource as any).context?.encounter?.[0]?.reference?.replace("Encounter/", "") ?? "",
+      type: (resource as any).type?.coding?.[0]?.code === "18842-5" ? "discharge_summary" : "medication_reconciliation",
+      status: (resource as any).status === "current" ? "final" : "draft",
+      content,
+      created_at: (resource as any).date ?? "",
+      created_by: (resource as any).author?.[0]?.display ?? "unknown",
+    };
+  }
+
+  async updateDocument(
+    documentId: string,
+    updates: Partial<Pick<DocumentRecord, "content" | "status">>
+  ): Promise<DocumentRecord> {
+    // Fetch current document, apply updates, PUT back
+    const current = await this.getDocument(documentId);
+    const merged = { ...current, ...updates, updated_at: new Date().toISOString() };
+
+    const token = await this.auth.getAccessToken();
+    const fhirDoc = {
+      resourceType: "DocumentReference",
+      id: documentId,
+      status: merged.status === "final" ? "current" : "preliminary",
+      type: {
+        coding: [{ system: "http://loinc.org", code: merged.type === "discharge_summary" ? "18842-5" : "11503-0" }],
+      },
+      subject: { reference: `Patient/${merged.patient_id}` },
+      context: { encounter: [{ reference: `Encounter/${merged.encounter_id}` }] },
+      author: [{ display: merged.created_by }],
+      date: merged.created_at,
+      content: [
+        {
+          attachment: {
+            contentType: "text/plain",
+            data: Buffer.from(merged.content).toString("base64"),
+          },
+        },
+      ],
+    };
+
+    const res = await fetch(`${this.fhirBaseUrl}/DocumentReference/${documentId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/fhir+json",
+        Accept: "application/fhir+json",
+      },
+      body: JSON.stringify(fhirDoc),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`FHIR DocumentReference update failed: ${res.status} ${text}`);
+    }
+
+    return merged;
+  }
+
+  async deleteDocument(documentId: string): Promise<{ deleted: boolean }> {
+    const token = await this.auth.getAccessToken();
+
+    const res = await fetch(`${this.fhirBaseUrl}/DocumentReference/${documentId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/fhir+json",
+      },
+    });
+
+    if (!res.ok && res.status !== 204) {
+      throw new Error(`Document not found: ${documentId}`);
+    }
+
+    return { deleted: true };
   }
 }

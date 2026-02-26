@@ -3,6 +3,8 @@ import type {
   MedicationData,
   LabResult,
   VitalSign,
+  EncounterData,
+  AdmissionMedication,
 } from "./datasource";
 
 // FHIR R4 types (minimal for mapping)
@@ -234,6 +236,112 @@ export function mapFhirVitalSigns(
         status,
       });
     }
+  }
+  return result;
+}
+
+// --- Encounter + Admission Medication mappers (Bounty) ---
+
+interface FhirEncounter {
+  id?: string;
+  status?: string;
+  class?: { code?: string };
+  type?: Array<{ text?: string }>;
+  period?: { start?: string; end?: string };
+  reasonCode?: Array<{ text?: string; coding?: Array<{ display?: string }> }>;
+  diagnosis?: Array<{
+    condition?: { display?: string };
+    use?: { coding?: Array<{ code?: string }> };
+  }>;
+  participant?: Array<{
+    individual?: { display?: string };
+    type?: Array<{ coding?: Array<{ code?: string }> }>;
+  }>;
+}
+
+function mapEncounterType(classCode: string | undefined): EncounterData["type"] {
+  switch (classCode?.toUpperCase()) {
+    case "IMP":
+    case "ACUTE":
+    case "NONAC":
+      return "inpatient";
+    case "EMER":
+      return "emergency";
+    default:
+      return "outpatient";
+  }
+}
+
+function mapEncounterStatus(fhirStatus: string | undefined): EncounterData["status"] {
+  switch (fhirStatus) {
+    case "in-progress":
+    case "arrived":
+      return "active";
+    case "finished":
+    case "completed":
+      return "discharged";
+    default:
+      return "active";
+  }
+}
+
+export function mapFhirEncounters(
+  patientId: string,
+  bundle: FhirBundle<FhirEncounter>
+): EncounterData[] {
+  const result: EncounterData[] = [];
+  for (const e of bundle.entry ?? []) {
+    const r = e.resource;
+    if (!r) continue;
+
+    const attending = r.participant?.find(
+      (p) => p.type?.some((t) => t.coding?.some((c) => c.code === "ATND"))
+    )?.individual?.display ?? r.participant?.[0]?.individual?.display ?? "Unknown";
+
+    const reason = r.reasonCode?.[0]?.text ?? r.reasonCode?.[0]?.coding?.[0]?.display ?? "";
+    const diagnoses = (r.diagnosis ?? [])
+      .map((d) => d.condition?.display)
+      .filter((d): d is string => !!d);
+
+    result.push({
+      encounter_id: r.id ?? "",
+      patient_id: patientId,
+      type: mapEncounterType(r.class?.code),
+      admission_date: r.period?.start ?? "",
+      discharge_date: r.period?.end,
+      status: mapEncounterStatus(r.status),
+      attending_provider: attending,
+      admission_reason: reason,
+      diagnoses,
+      procedures: [], // FHIR Procedure is a separate resource; fetched separately if needed
+      hospital_course_notes: [], // Not standard in FHIR Encounter; added from clinical notes
+    });
+  }
+  return result;
+}
+
+export function mapFhirAdmissionMedications(
+  bundle: FhirBundle<FhirMedicationRequest>
+): AdmissionMedication[] {
+  const result: AdmissionMedication[] = [];
+  for (const e of bundle.entry ?? []) {
+    const r = e.resource;
+    if (!r) continue;
+
+    // Map FHIR MedicationRequest status to our admission medication categories
+    let status: AdmissionMedication["status"] = "continued";
+    if (r.status === "stopped" || r.status === "cancelled") {
+      status = "discontinued";
+    } else if (r.status === "draft") {
+      status = "new";
+    }
+
+    result.push({
+      name: extractMedicationName(r),
+      dose: extractDose(r),
+      frequency: extractFrequency(r),
+      status,
+    });
   }
   return result;
 }

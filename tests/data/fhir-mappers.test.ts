@@ -4,6 +4,8 @@ import {
   mapFhirMedications,
   mapFhirLabResults,
   mapFhirVitalSigns,
+  mapFhirEncounters,
+  mapFhirAdmissionMedications,
 } from "../../src/data/fhir-mappers";
 import * as fs from "fs";
 import * as path from "path";
@@ -298,6 +300,149 @@ describe("fhir-mappers", () => {
       const empty = loadFixture("empty-bundle.json");
 
       const result = mapFhirVitalSigns(empty);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("mapFhirEncounters", () => {
+    it("maps FHIR Encounter bundle to EncounterData[]", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          {
+            resource: {
+              id: "enc-1",
+              status: "finished",
+              class: { code: "IMP" },
+              period: { start: "2024-01-05", end: "2024-01-10" },
+              reasonCode: [{ text: "Atrial Fibrillation with RVR" }],
+              diagnosis: [
+                { condition: { display: "AFib" } },
+                { condition: { display: "Hypertension" } },
+              ],
+              participant: [
+                {
+                  individual: { display: "Dr. Smith" },
+                  type: [{ coding: [{ code: "ATND" }] }],
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const result = mapFhirEncounters("1", bundle);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].encounter_id).toBe("enc-1");
+      expect(result[0].patient_id).toBe("1");
+      expect(result[0].type).toBe("inpatient");
+      expect(result[0].status).toBe("discharged");
+      expect(result[0].attending_provider).toBe("Dr. Smith");
+      expect(result[0].admission_reason).toBe("Atrial Fibrillation with RVR");
+      expect(result[0].diagnoses).toEqual(["AFib", "Hypertension"]);
+    });
+
+    it("maps encounter class codes to types correctly", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          { resource: { id: "e1", class: { code: "IMP" }, period: {} } },
+          { resource: { id: "e2", class: { code: "EMER" }, period: {} } },
+          { resource: { id: "e3", class: { code: "AMB" }, period: {} } },
+        ],
+      };
+
+      const result = mapFhirEncounters("1", bundle);
+
+      expect(result[0].type).toBe("inpatient");
+      expect(result[1].type).toBe("emergency");
+      expect(result[2].type).toBe("outpatient");
+    });
+
+    it("maps encounter status correctly", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          { resource: { id: "e1", status: "in-progress", period: {} } },
+          { resource: { id: "e2", status: "finished", period: {} } },
+          { resource: { id: "e3", status: "arrived", period: {} } },
+        ],
+      };
+
+      const result = mapFhirEncounters("1", bundle);
+
+      expect(result[0].status).toBe("active");
+      expect(result[1].status).toBe("discharged");
+      expect(result[2].status).toBe("active");
+    });
+
+    it("handles empty bundle", () => {
+      const result = mapFhirEncounters("1", { entry: [] });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("mapFhirAdmissionMedications", () => {
+    it("maps MedicationRequest statuses to admission medication categories", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          {
+            resource: {
+              medicationCodeableConcept: { text: "Lisinopril" },
+              dosageInstruction: [{ doseAndRate: [{ doseQuantity: { value: 10, unit: "mg" } }], timing: { code: { text: "daily" } } }],
+              status: "active",
+            },
+          },
+          {
+            resource: {
+              medicationCodeableConcept: { text: "Metformin" },
+              dosageInstruction: [{ doseAndRate: [{ doseQuantity: { value: 500, unit: "mg" } }], timing: { code: { text: "BID" } } }],
+              status: "stopped",
+            },
+          },
+          {
+            resource: {
+              medicationCodeableConcept: { text: "Metoprolol" },
+              dosageInstruction: [{ doseAndRate: [{ doseQuantity: { value: 25, unit: "mg" } }], timing: { code: { text: "BID" } } }],
+              status: "draft",
+            },
+          },
+        ],
+      };
+
+      const result = mapFhirAdmissionMedications(bundle);
+
+      expect(result).toHaveLength(3);
+      expect(result[0]).toMatchObject({ name: "Lisinopril", status: "continued" });
+      expect(result[1]).toMatchObject({ name: "Metformin", status: "discontinued" });
+      expect(result[2]).toMatchObject({ name: "Metoprolol", status: "new" });
+    });
+
+    it("maps cancelled status to discontinued", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          {
+            resource: {
+              medicationCodeableConcept: { text: "Drug A" },
+              dosageInstruction: [],
+              status: "cancelled",
+            },
+          },
+        ],
+      };
+
+      const result = mapFhirAdmissionMedications(bundle);
+
+      expect(result[0].status).toBe("discontinued");
+    });
+
+    it("handles empty bundle", () => {
+      const result = mapFhirAdmissionMedications({ entry: [] });
 
       expect(result).toEqual([]);
     });
