@@ -71,12 +71,25 @@ export interface DocumentRecord {
   updated_at?: string;
 }
 
+export interface Appointment {
+  appointment_id: string;
+  patient_id: string;
+  provider: string;
+  specialty: string;
+  date: string;
+  time: string;
+  location: string;
+  reason: string;
+  status: "scheduled" | "confirmed" | "cancelled" | "completed";
+}
+
 export interface DataSource {
   getPatient(id: string): Promise<PatientData>;
   getMedications(patientId: string): Promise<MedicationData[]>;
   getLabResults(patientId: string): Promise<LabResult[]>;
   getEncounters(patientId: string): Promise<EncounterData[]>;
   getAdmissionMedications(encounterId: string): Promise<AdmissionMedication[]>;
+  getAppointments(patientId: string): Promise<Appointment[]>;
   saveDocument(doc: Omit<DocumentRecord, "document_id" | "created_at">): Promise<DocumentRecord>;
   getDocument(documentId: string): Promise<DocumentRecord>;
   updateDocument(documentId: string, updates: Partial<Pick<DocumentRecord, "content" | "status">>): Promise<DocumentRecord>;

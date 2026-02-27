@@ -268,6 +268,87 @@ describe("server", () => {
       const res = await makeRequest(app, "DELETE", "/api/documents/doc-nonexistent");
       expect(res.status).toBe(404);
     });
+
+    it("POST /api/documents/:id/finalize accepts optional content to update before finalizing", async () => {
+      const ds = getDataSource();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Original AI draft",
+        created_by: "ai-agent",
+      });
+      const res = await makeRequest(app, "POST", `/api/documents/${doc.document_id}/finalize`, {
+        content: "Practitioner-edited content",
+      });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.document.status).toBe("final");
+      expect(body.document.content).toBe("Practitioner-edited content");
+    });
+
+    it("PUT /api/documents/:id updates content of a draft document", async () => {
+      const ds = getDataSource();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Original content",
+        created_by: "ai-agent",
+      });
+      const res = await makeRequest(app, "PUT", `/api/documents/${doc.document_id}`, {
+        content: "Updated by practitioner",
+      });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.content).toBe("Updated by practitioner");
+      expect(body.status).toBe("draft");
+    });
+
+    it("PUT /api/documents/:id rejects edit of finalized document with 400", async () => {
+      const ds = getDataSource();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Finalize me",
+        created_by: "ai-agent",
+      });
+      await ds.updateDocument(doc.document_id, { status: "final" });
+      const res = await makeRequest(app, "PUT", `/api/documents/${doc.document_id}`, {
+        content: "Should not work",
+      });
+      expect(res.status).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("finalized");
+    });
+
+    it("PUT /api/documents/:id returns 400 when content is missing", async () => {
+      const ds = getDataSource();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Original",
+        created_by: "ai-agent",
+      });
+      const res = await makeRequest(app, "PUT", `/api/documents/${doc.document_id}`, {});
+      expect(res.status).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("content");
+    });
+
+    it("PUT /api/documents/:id returns 404 for unknown document", async () => {
+      const res = await makeRequest(app, "PUT", "/api/documents/doc-nonexistent", {
+        content: "Doesn't matter",
+      });
+      expect(res.status).toBe(404);
+    });
   });
 });
 

@@ -5,6 +5,7 @@ import type {
   VitalSign,
   EncounterData,
   AdmissionMedication,
+  Appointment,
 } from "./datasource";
 
 // FHIR R4 types (minimal for mapping)
@@ -341,6 +342,90 @@ export function mapFhirAdmissionMedications(
       dose: extractDose(r),
       frequency: extractFrequency(r),
       status,
+    });
+  }
+  return result;
+}
+
+// --- Appointment mapper ---
+
+interface FhirAppointment {
+  id?: string;
+  status?: string;
+  start?: string;
+  end?: string;
+  description?: string;
+  serviceType?: Array<{ text?: string; coding?: Array<{ display?: string }> }>;
+  participant?: Array<{
+    actor?: { reference?: string; display?: string };
+    type?: Array<{ coding?: Array<{ code?: string }> }>;
+  }>;
+  reasonCode?: Array<{ text?: string; coding?: Array<{ display?: string }> }>;
+}
+
+function mapFhirAppointmentStatus(fhirStatus: string | undefined): Appointment["status"] {
+  switch (fhirStatus) {
+    case "booked":
+    case "pending":
+      return "scheduled";
+    case "arrived":
+    case "checked-in":
+      return "confirmed";
+    case "cancelled":
+    case "noshow":
+      return "cancelled";
+    case "fulfilled":
+      return "completed";
+    default:
+      return "scheduled";
+  }
+}
+
+export function mapFhirAppointments(
+  patientId: string,
+  bundle: FhirBundle<FhirAppointment>
+): Appointment[] {
+  const result: Appointment[] = [];
+  for (const e of bundle.entry ?? []) {
+    const r = e.resource;
+    if (!r) continue;
+
+    const practitioner = r.participant?.find(
+      (p) => p.actor?.reference?.startsWith("Practitioner/")
+    );
+    const provider = practitioner?.actor?.display ?? "Unknown";
+
+    const specialty = r.serviceType?.[0]?.text
+      ?? r.serviceType?.[0]?.coding?.[0]?.display
+      ?? "";
+
+    const reason = r.reasonCode?.[0]?.text
+      ?? r.reasonCode?.[0]?.coding?.[0]?.display
+      ?? r.description
+      ?? "";
+
+    const startDate = r.start ? new Date(r.start) : null;
+    const date = startDate ? startDate.toISOString().split("T")[0] : "";
+    const time = startDate
+      ? startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+      : "";
+
+    // Location from participant with Location reference
+    const locationParticipant = r.participant?.find(
+      (p) => p.actor?.reference?.startsWith("Location/")
+    );
+    const location = locationParticipant?.actor?.display ?? "";
+
+    result.push({
+      appointment_id: r.id ?? "",
+      patient_id: patientId,
+      provider,
+      specialty,
+      date,
+      time,
+      location,
+      reason,
+      status: mapFhirAppointmentStatus(r.status),
     });
   }
   return result;

@@ -187,5 +187,90 @@
       { "name": "Glipizide", "dose": "5mg", "frequency": "twice daily", "status": "new", "modification_reason": "Added for improved glycemic control" }
     ]
   },
+  "appointments": {
+    "1": [
+      {
+        "appointment_id": "appt-101",
+        "patient_id": "1",
+        "provider": "Dr. Patel",
+        "specialty": "Cardiology",
+        "date": "2024-01-24",
+        "time": "10:00 AM",
+        "location": "Heart Center, Suite 200",
+        "reason": "Atrial fibrillation follow-up and rate control assessment",
+        "status": "scheduled"
+      },
+      {
+        "appointment_id": "appt-102",
+        "patient_id": "1",
+        "provider": "Dr. Rivera",
+        "specialty": "Endocrinology",
+        "date": "2024-01-31",
+        "time": "2:30 PM",
+        "location": "Diabetes & Endocrine Clinic, Room 105",
+        "reason": "Type 2 diabetes management and HbA1c review",
+        "status": "scheduled"
+      },
+      {
+        "appointment_id": "appt-103",
+        "patient_id": "1",
+        "provider": "Dr. Smith",
+        "specialty": "Primary Care",
+        "date": "2024-02-07",
+        "time": "9:00 AM",
+        "location": "Family Medicine Clinic",
+        "reason": "Post-discharge follow-up and blood pressure check",
+        "status": "confirmed"
+      }
+    ],
+    "2": [],
+    "3": [],
+    "4": [
+      {
+        "appointment_id": "appt-401",
+        "patient_id": "4",
+        "provider": "Dr. Smith",
+        "specialty": "Primary Care",
+        "date": "2024-02-01",
+        "time": "10:30 AM",
+        "location": "Family Medicine Clinic",
+        "reason": "Post-discharge comprehensive review",
+        "status": "scheduled"
+      },
+      {
+        "appointment_id": "appt-402",
+        "patient_id": "4",
+        "provider": "Dr. Chen",
+        "specialty": "Nephrology",
+        "date": "2024-02-05",
+        "time": "1:00 PM",
+        "location": "Kidney Care Center, Suite 310",
+        "reason": "Chronic kidney disease monitoring and renal function labs",
+        "status": "scheduled"
+      },
+      {
+        "appointment_id": "appt-403",
+        "patient_id": "4",
+        "provider": "Dr. Rivera",
+        "specialty": "Endocrinology",
+        "date": "2024-02-12",
+        "time": "3:00 PM",
+        "location": "Diabetes & Endocrine Clinic, Room 105",
+        "reason": "Diabetes management and medication adjustment",
+        "status": "confirmed"
+      },
+      {
+        "appointment_id": "appt-404",
+        "patient_id": "4",
+        "provider": "Dr. Patel",
+        "specialty": "Cardiology",
+        "date": "2024-02-19",
+        "time": "11:00 AM",
+        "location": "Heart Center, Suite 200",
+        "reason": "Atrial fibrillation and heart failure follow-up",
+        "status": "scheduled"
+      }
+    ]
+  },
   "documents": {}
 }

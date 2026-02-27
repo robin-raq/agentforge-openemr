@@ -7,6 +7,7 @@ import type {
   LabResult,
   EncounterData,
   AdmissionMedication,
+  Appointment,
   DocumentRecord,
 } from "./datasource";
 
@@ -16,6 +17,7 @@ interface MockData {
   lab_results: Record<string, LabResult[]>;
   encounters: Record<string, EncounterData[]>;
   admission_medications: Record<string, AdmissionMedication[]>;
+  appointments: Record<string, Appointment[]>;
   documents: Record<string, DocumentRecord>;
 }
 
@@ -63,6 +65,14 @@ export class MockDataSource implements DataSource {
 
   async getAdmissionMedications(encounterId: string): Promise<AdmissionMedication[]> {
     return this.data.admission_medications[encounterId] ?? [];
+  }
+
+  async getAppointments(patientId: string): Promise<Appointment[]> {
+    const patient = this.data.patients[patientId];
+    if (!patient) {
+      throw new Error(`Patient not found: ${patientId}`);
+    }
+    return this.data.appointments[patientId] ?? [];
   }
 
   async saveDocument(

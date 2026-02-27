@@ -269,13 +269,18 @@
     footer a { color: #64748b; text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
-    .finalize-btn {
+    .doc-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.625rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .finalize-btn, .edit-btn, .save-edit-btn, .cancel-edit-btn {
       display: inline-flex;
       align-items: center;
       gap: 0.375rem;
-      margin-top: 0.625rem;
       padding: 0.5rem 1rem;
-      background: #16a34a;
       color: white;
       border: none;
       border-radius: 8px;
@@ -285,12 +290,38 @@
       cursor: pointer;
       transition: background 0.15s;
     }
+    .finalize-btn { background: #16a34a; }
     .finalize-btn:hover { background: #15803d; }
     .finalize-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .finalize-btn.finalized {
       background: #e2e8f0;
       color: #64748b;
       cursor: default;
+    }
+    .edit-btn { background: #2563eb; }
+    .edit-btn:hover { background: #1d4ed8; }
+    .edit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .save-edit-btn { background: #16a34a; }
+    .save-edit-btn:hover { background: #15803d; }
+    .cancel-edit-btn { background: #64748b; }
+    .cancel-edit-btn:hover { background: #475569; }
+    .draft-editor {
+      width: 100%;
+      min-height: 200px;
+      margin-top: 0.625rem;
+      padding: 0.75rem;
+      border: 2px solid #2563eb;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      resize: vertical;
+      background: #fefce8;
+    }
+    .draft-editor:focus {
+      outline: none;
+      border-color: #1d4ed8;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
   </style>
 </head>
@@ -426,16 +457,19 @@
         })), null, 2)) + '</div></div>';
       }
 
-      // Finalize button when save_to_chart tool was used
+      // Edit + Finalize buttons when save_to_chart tool was used
       if (toolCalls && toolCalls.length > 0) {
         const saveCall = toolCalls.find(tc => tc.name === 'save_to_chart');
         if (saveCall) {
-          // Extract document_id from tool output (agent returns it in response)
           const docIdMatch = content.match(/Document ID:\s*(doc-\w+)/i) || content.match(/(doc-\d+)/);
           const docId = docIdMatch ? docIdMatch[1] : null;
           if (docId) {
-            html += '<button class="finalize-btn" data-doc-id="' + escapeHtml(docId) + '" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">';
+            html += '<div class="doc-actions" data-doc-id="' + escapeHtml(docId) + '">';
+            html += '<button class="edit-btn" onclick="editDraft(this, \'' + escapeHtml(docId) + '\')">';
+            html += '\u270F\uFE0F Edit Draft</button>';
+            html += '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">';
             html += '\u2705 Finalize &amp; Save to Chart</button>';
+            html += '</div>';
           }
         }
       }
@@ -464,18 +498,126 @@
       }).catch(() => {});
     }
 
+    async function editDraft(btn, docId) {
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      try {
+        const res = await fetch('/api/documents/' + encodeURIComponent(docId));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load document');
+
+        const bubble = btn.closest('.message-bubble');
+        const contentDiv = bubble.querySelector('.message-content');
+        const actionsDiv = bubble.querySelector('.doc-actions');
+
+        // Hide original content, show textarea
+        contentDiv.style.display = 'none';
+        const textarea = document.createElement('textarea');
+        textarea.className = 'draft-editor';
+        textarea.value = data.content;
+        textarea.dataset.docId = docId;
+        contentDiv.after(textarea);
+        textarea.focus();
+
+        // Replace buttons with Save/Cancel
+        actionsDiv.innerHTML =
+          '<button class="save-edit-btn" onclick="saveDraftEdit(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u{1F4BE} Save Edit</button>' +
+          '<button class="cancel-edit-btn" onclick="cancelDraftEdit(this, \'' + escapeHtml(docId) + '\')">' +
+          'Cancel</button>' +
+          '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u2705 Finalize &amp; Save to Chart</button>';
+      } catch (err) {
+        btn.textContent = '\u274C ' + (err.message || 'Load failed');
+        btn.disabled = false;
+      }
+    }
+
+    async function saveDraftEdit(btn, docId) {
+      const bubble = btn.closest('.message-bubble');
+      const textarea = bubble.querySelector('.draft-editor');
+      const newContent = textarea.value;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      try {
+        const res = await fetch('/api/documents/' + encodeURIComponent(docId), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: newContent })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+
+        // Update display with edited content
+        const contentDiv = bubble.querySelector('.message-content');
+        contentDiv.textContent = newContent;
+        contentDiv.style.display = '';
+        textarea.remove();
+
+        // Restore Edit + Finalize buttons
+        const actionsDiv = bubble.querySelector('.doc-actions');
+        actionsDiv.innerHTML =
+          '<button class="edit-btn" onclick="editDraft(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u270F\uFE0F Edit Draft</button>' +
+          '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u2705 Finalize &amp; Save to Chart</button>';
+      } catch (err) {
+        btn.textContent = '\u274C ' + (err.message || 'Save failed');
+        btn.disabled = false;
+      }
+    }
+
+    function cancelDraftEdit(btn, docId) {
+      const bubble = btn.closest('.message-bubble');
+      const textarea = bubble.querySelector('.draft-editor');
+      const contentDiv = bubble.querySelector('.message-content');
+
+      contentDiv.style.display = '';
+      textarea.remove();
+
+      // Restore Edit + Finalize buttons
+      const actionsDiv = bubble.querySelector('.doc-actions');
+      actionsDiv.innerHTML =
+        '<button class="edit-btn" onclick="editDraft(this, \'' + escapeHtml(docId) + '\')">' +
+        '\u270F\uFE0F Edit Draft</button>' +
+        '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">' +
+        '\u2705 Finalize &amp; Save to Chart</button>';
+    }
+
     async function finalizeDocument(btn, docId) {
       btn.disabled = true;
       btn.textContent = 'Finalizing...';
       try {
+        const bubble = btn.closest('.message-bubble');
+        const textarea = bubble ? bubble.querySelector('.draft-editor') : null;
+        const body = {};
+        if (textarea) {
+          body.content = textarea.value;
+        }
         const res = await fetch('/api/documents/' + encodeURIComponent(docId) + '/finalize', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Finalize failed');
-        btn.textContent = '\u2705 Finalized — Saved to Chart';
-        btn.classList.add('finalized');
+
+        // Clean up editor if present
+        if (textarea) {
+          const contentDiv = bubble.querySelector('.message-content');
+          contentDiv.textContent = textarea.value;
+          contentDiv.style.display = '';
+          textarea.remove();
+        }
+
+        // Disable all buttons
+        const actionsDiv = btn.closest('.doc-actions');
+        if (actionsDiv) {
+          actionsDiv.innerHTML = '<span class="finalize-btn finalized">\u2705 Finalized — Saved to Chart</span>';
+        } else {
+          btn.textContent = '\u2705 Finalized — Saved to Chart';
+          btn.classList.add('finalized');
+        }
       } catch (err) {
         btn.textContent = '\u274C Finalize failed — ' + (err.message || 'Try again');
         btn.disabled = false;

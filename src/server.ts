@@ -174,10 +174,32 @@ export function createApp(): express.Express {
   // Document CRUD endpoints
   app.post("/api/documents/:id/finalize", async (req, res) => {
     try {
-      const doc = await dataSource.updateDocument(req.params.id, { status: "final" });
+      const updates: { status: "final"; content?: string } = { status: "final" };
+      if (req.body?.content && typeof req.body.content === "string") {
+        updates.content = req.body.content;
+      }
+      const doc = await dataSource.updateDocument(req.params.id, updates);
       res.json({ success: true, document: doc, message: "Document finalized and saved to chart." });
     } catch {
       res.status(404).json({ error: "Document not found or already finalized." });
+    }
+  });
+
+  app.put("/api/documents/:id", async (req, res) => {
+    try {
+      if (!req.body?.content || typeof req.body.content !== "string") {
+        res.status(400).json({ error: "content is required and must be a string." });
+        return;
+      }
+      const existing = await dataSource.getDocument(req.params.id);
+      if (existing.status === "final") {
+        res.status(400).json({ error: "Cannot edit a finalized document." });
+        return;
+      }
+      const doc = await dataSource.updateDocument(req.params.id, { content: req.body.content });
+      res.json(doc);
+    } catch {
+      res.status(404).json({ error: "Document not found." });
     }
   });
 

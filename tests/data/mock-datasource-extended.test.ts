@@ -230,3 +230,45 @@ describe("MockDataSource — document CRUD", () => {
     expect(doc1.document_id).not.toBe(doc2.document_id);
   });
 });
+
+describe("MockDataSource — appointments", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    ds = new MockDataSource();
+  });
+
+  it("returns scheduled appointments for patient 1", async () => {
+    const appointments = await ds.getAppointments("1");
+    expect(appointments.length).toBeGreaterThan(0);
+  });
+
+  it("returns empty array for patient 2 (no appointments)", async () => {
+    const appointments = await ds.getAppointments("2");
+    expect(appointments).toEqual([]);
+  });
+
+  it("returns multiple appointments for patient 4", async () => {
+    const appointments = await ds.getAppointments("4");
+    expect(appointments.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("throws for unknown patient ID", async () => {
+    await expect(ds.getAppointments("99999")).rejects.toThrow("Patient not found");
+  });
+
+  it("each appointment has required fields", async () => {
+    const appointments = await ds.getAppointments("1");
+    for (const appt of appointments) {
+      expect(appt).toHaveProperty("appointment_id");
+      expect(appt).toHaveProperty("patient_id");
+      expect(appt).toHaveProperty("provider");
+      expect(appt).toHaveProperty("specialty");
+      expect(appt).toHaveProperty("date");
+      expect(appt).toHaveProperty("time");
+      expect(appt).toHaveProperty("location");
+      expect(appt).toHaveProperty("reason");
+      expect(appt).toHaveProperty("status");
+    }
+  });
+});

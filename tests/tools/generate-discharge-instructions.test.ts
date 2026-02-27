@@ -146,4 +146,49 @@ describe("generate_discharge_instructions", () => {
     expect(result.data_sources).toContain("OpenEMR");
     expect(result.data_sources).toContain("DailyMed (NLM/NIH)");
   });
+
+  it("includes scheduled_appointments array in output", async () => {
+    const result = JSON.parse(
+      await toolFn.invoke({ patient_id: "1", encounter_id: "enc-101" })
+    );
+    expect(result.scheduled_appointments).toBeDefined();
+    expect(result.scheduled_appointments).toBeInstanceOf(Array);
+  });
+
+  it("patient 1 has non-empty scheduled appointments", async () => {
+    const result = JSON.parse(
+      await toolFn.invoke({ patient_id: "1", encounter_id: "enc-101" })
+    );
+    expect(result.scheduled_appointments.length).toBeGreaterThan(0);
+  });
+
+  it("each appointment has provider, specialty, date, time, location, reason", async () => {
+    const result = JSON.parse(
+      await toolFn.invoke({ patient_id: "1", encounter_id: "enc-101" })
+    );
+    for (const appt of result.scheduled_appointments) {
+      expect(appt).toHaveProperty("provider");
+      expect(appt).toHaveProperty("specialty");
+      expect(appt).toHaveProperty("date");
+      expect(appt).toHaveProperty("time");
+      expect(appt).toHaveProperty("location");
+      expect(appt).toHaveProperty("reason");
+    }
+  });
+
+  it("appointments are sorted by date", async () => {
+    const result = JSON.parse(
+      await toolFn.invoke({ patient_id: "1", encounter_id: "enc-101" })
+    );
+    const dates = result.scheduled_appointments.map((a: { date: string }) => a.date);
+    const sorted = [...dates].sort();
+    expect(dates).toEqual(sorted);
+  });
+
+  it("patient 4 has 4 scheduled appointments", async () => {
+    const result = JSON.parse(
+      await toolFn.invoke({ patient_id: "4", encounter_id: "enc-401" })
+    );
+    expect(result.scheduled_appointments).toHaveLength(4);
+  });
 });

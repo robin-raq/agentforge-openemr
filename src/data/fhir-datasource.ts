@@ -1,10 +1,10 @@
 import type {
   DataSource, PatientData, MedicationData, LabResult,
-  EncounterData, AdmissionMedication, DocumentRecord,
+  EncounterData, AdmissionMedication, Appointment, DocumentRecord,
 } from "./datasource";
 import {
   mapFhirPatient, mapFhirMedications, mapFhirLabResults,
-  mapFhirEncounters, mapFhirAdmissionMedications,
+  mapFhirEncounters, mapFhirAdmissionMedications, mapFhirAppointments,
 } from "./fhir-mappers";
 import { FhirAuthManager, FHIR_SCOPES } from "./fhir-auth";
 import { PatientIdResolver } from "./patient-id-resolver";
@@ -148,6 +148,16 @@ export class FhirDataSource implements DataSource {
     );
 
     return mapFhirAdmissionMedications(bundle as Parameters<typeof mapFhirAdmissionMedications>[0]);
+  }
+
+  async getAppointments(patientId: string): Promise<Appointment[]> {
+    const uuid = await this.resolveUuid(patientId);
+
+    const bundle = await this.fhirFetch(
+      `/Appointment?patient=${uuid}&status=booked,arrived,checked-in,pending&_sort=date&_count=50`
+    );
+
+    return mapFhirAppointments(patientId, bundle as Parameters<typeof mapFhirAppointments>[1]);
   }
 
   // --- Document CRUD via FHIR DocumentReference ---

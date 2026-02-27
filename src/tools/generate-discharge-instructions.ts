@@ -75,10 +75,11 @@ export function generateDischargeInstructions(dataSource: DataSource) {
   return tool(
     async ({ patient_id, encounter_id }) => {
       try {
-        const [patient, encounters, admissionMeds] = await Promise.all([
+        const [patient, encounters, admissionMeds, appointments] = await Promise.all([
           dataSource.getPatient(patient_id),
           dataSource.getEncounters(patient_id),
           dataSource.getAdmissionMedications(encounter_id),
+          dataSource.getAppointments(patient_id),
         ]);
 
         const encounter = encounters.find(
@@ -189,6 +190,19 @@ export function generateDischargeInstructions(dataSource: DataSource) {
           "Contact your primary care provider if you have questions about your medications"
         );
 
+        // Filter out cancelled appointments and sort by date
+        const scheduledAppointments = appointments
+          .filter((a) => a.status !== "cancelled")
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map((a) => ({
+            provider: a.provider,
+            specialty: a.specialty,
+            date: a.date,
+            time: a.time,
+            location: a.location,
+            reason: a.reason,
+          }));
+
         return JSON.stringify({
           type: "discharge_instructions",
           patient: {
@@ -212,6 +226,7 @@ export function generateDischargeInstructions(dataSource: DataSource) {
           allergy_reminders: patient.allergies,
           warning_signs: [...warningSignSet],
           follow_up_guidance: [...followUpSet],
+          scheduled_appointments: scheduledAppointments,
           safety_flags: {
             has_new_medications: newMeds.length > 0,
             has_modified_medications: modifiedMeds.length > 0,

@@ -6,6 +6,7 @@ import {
   mapFhirVitalSigns,
   mapFhirEncounters,
   mapFhirAdmissionMedications,
+  mapFhirAppointments,
 } from "../../src/data/fhir-mappers";
 import * as fs from "fs";
 import * as path from "path";
@@ -443,6 +444,69 @@ describe("fhir-mappers", () => {
 
     it("handles empty bundle", () => {
       const result = mapFhirAdmissionMedications({ entry: [] });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("mapFhirAppointments", () => {
+    it("maps FHIR Appointment bundle to Appointment[]", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          {
+            resource: {
+              id: "appt-1",
+              status: "booked",
+              start: "2024-01-24T10:00:00Z",
+              serviceType: [{ text: "Cardiology" }],
+              reasonCode: [{ text: "Atrial fibrillation follow-up" }],
+              participant: [
+                {
+                  actor: { reference: "Practitioner/123", display: "Dr. Patel" },
+                  type: [{ coding: [{ code: "ATND" }] }],
+                },
+                {
+                  actor: { reference: "Location/456", display: "Heart Center, Suite 200" },
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const result = mapFhirAppointments("1", bundle);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].appointment_id).toBe("appt-1");
+      expect(result[0].patient_id).toBe("1");
+      expect(result[0].provider).toBe("Dr. Patel");
+      expect(result[0].specialty).toBe("Cardiology");
+      expect(result[0].date).toBe("2024-01-24");
+      expect(result[0].reason).toBe("Atrial fibrillation follow-up");
+      expect(result[0].status).toBe("scheduled");
+      expect(result[0].location).toBe("Heart Center, Suite 200");
+    });
+
+    it("maps appointment statuses correctly", () => {
+      const bundle = {
+        resourceType: "Bundle",
+        entry: [
+          { resource: { id: "a1", status: "booked", start: "2024-01-20T10:00:00Z" } },
+          { resource: { id: "a2", status: "cancelled", start: "2024-01-21T10:00:00Z" } },
+          { resource: { id: "a3", status: "fulfilled", start: "2024-01-22T10:00:00Z" } },
+        ],
+      };
+
+      const result = mapFhirAppointments("1", bundle);
+
+      expect(result[0].status).toBe("scheduled");
+      expect(result[1].status).toBe("cancelled");
+      expect(result[2].status).toBe("completed");
+    });
+
+    it("handles empty bundle", () => {
+      const result = mapFhirAppointments("1", { entry: [] });
 
       expect(result).toEqual([]);
     });
