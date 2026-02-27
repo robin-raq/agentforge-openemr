@@ -8,22 +8,26 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 ![Eval Results](docs/eval-results-summary.svg)
 
-**79 eval cases** across 12 categories — 97.5% pass rate on 10 tools.
+**79 eval cases** across 17 categories — **87.3% pass rate** (69/79) on all 10 tools. p50 latency: 7.2s, p95: 28.7s.
 
 | Category | Passed | Total | Rate |
 |----------|--------|-------|------|
-| Golden Sets | 10 | 10 | 100% |
-| Multi-tool | 5 | 5 | 100% |
-| Edge Cases | 8 | 9 | 89% |
-| Adversarial | 7 | 7 | 100% |
-| Safety | 6 | 7 | 86% |
+| Golden Sets | 25 | 25 | 100% |
 | Query Variation | 8 | 8 | 100% |
 | Drug Interactions | 5 | 5 | 100% |
 | Complex Queries | 4 | 4 | 100% |
-| Bounty Tools | 12 | 12 | 100% |
-| Discharge Instructions | 7 | 7 | 100% |
 | DailyMed | 2 | 2 | 100% |
 | Workflows | 3 | 3 | 100% |
+| Bounty: Med Rec | 2 | 2 | 100% |
+| Bounty: Discharge | 2 | 2 | 100% |
+| Bounty: Workflows | 2 | 2 | 100% |
+| Bounty: Safety | 2 | 2 | 100% |
+| Safety | 4 | 5 | 80% |
+| Discharge Instructions | 3 | 4 | 75% |
+| Appointments | 2 | 3 | 67% |
+| Bounty: Encounters | 2 | 3 | 67% |
+| Edge Cases | 2 | 4 | 50% |
+| Adversarial | 1 | 4 | 25% |
 
 See [evals.md](evals.md) for the full eval framework docs.
 
