@@ -4,6 +4,33 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 **Live Demo:** https://agent-production-6f7a.up.railway.app
 
+## Demo
+
+### Patient Selection + Quick Prompts
+Select a patient and use quick-prompt buttons for common clinical queries.
+
+![Patient Select](docs/demo-patient-select.gif)
+
+### Drug Interaction Check
+Severity-gated interaction analysis with clinical significance, monitoring requirements, and recommended actions.
+
+![Drug Interactions](docs/demo-drug-interactions.gif)
+
+### Medication Reconciliation
+Compare admission vs. discharge medications — flags continued, modified, new, and discontinued meds with reasons.
+
+![Med Reconciliation](docs/demo-med-reconciliation.gif)
+
+### Discharge Summary — Draft, Edit, Finalize
+AI drafts a comprehensive discharge summary. Practitioners review, edit, and finalize before saving to chart.
+
+![Discharge Edit Finalize](docs/demo-discharge-edit-finalize.gif)
+
+### Discharge Instructions + Scheduled Appointments
+Patient-friendly instructions with DailyMed drug education, warning signs, and actual scheduled follow-up appointments.
+
+![Discharge Instructions](docs/demo-discharge-instructions.gif)
+
 ## Eval Results
 
 ![Eval Results](docs/eval-results-summary.svg)
