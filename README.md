@@ -1,6 +1,31 @@
 # OpenEMR Clinical Query Agent
 
-AI agent for querying patient data, medications, and drug interactions via natural language. Built for the AgentForge / Gauntlet AI program.
+AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medication reconciliation, drug interactions, and patient-friendly discharge instructions — all via natural language. Built for the AgentForge / Gauntlet AI bounty.
+
+**Live Demo:** https://agent-production-6f7a.up.railway.app
+
+## Eval Results
+
+![Eval Results](docs/eval-results-summary.svg)
+
+**79 eval cases** across 12 categories — 97.5% pass rate on 10 tools.
+
+| Category | Passed | Total | Rate |
+|----------|--------|-------|------|
+| Golden Sets | 10 | 10 | 100% |
+| Multi-tool | 5 | 5 | 100% |
+| Edge Cases | 8 | 9 | 89% |
+| Adversarial | 7 | 7 | 100% |
+| Safety | 6 | 7 | 86% |
+| Query Variation | 8 | 8 | 100% |
+| Drug Interactions | 5 | 5 | 100% |
+| Complex Queries | 4 | 4 | 100% |
+| Bounty Tools | 12 | 12 | 100% |
+| Discharge Instructions | 7 | 7 | 100% |
+| DailyMed | 2 | 2 | 100% |
+| Workflows | 3 | 3 | 100% |
+
+See [evals.md](evals.md) for the full eval framework docs.
 
 ## Setup
 
@@ -24,9 +49,37 @@ Open http://localhost:3000 (local) or https://agent-production-6f7a.up.railway.a
 ## Test
 
 ```bash
-npm test       # Run Vitest
-npm run eval   # Run eval suite (requires ANTHROPIC_API_KEY)
+npm test       # Run 232 unit tests (Vitest)
+npm run eval   # Run 79 eval cases (requires ANTHROPIC_API_KEY)
 ```
+
+## Architecture
+
+- **Agent**: LangChain.js + Claude Sonnet 4, tool-calling with `createToolCallingAgent`
+- **10 Tools**: get_patient_summary, get_medications, drug_interaction_check, allergy_check, get_lab_results, get_encounter_data, reconcile_medications, draft_discharge_summary, generate_discharge_instructions, save_to_chart
+- **Data Sources**: Mock JSON (DATA_SOURCE=mock) or OpenEMR FHIR R4 API (DATA_SOURCE=fhir) + DailyMed REST API (NLM/NIH) for drug education
+- **Stateful CRUD**: Documents with create/read/update/finalize — editable drafts with clinician review before finalization
+- **Verification**: Drug interaction severity gate, source attribution, medical disclaimer
+- **Observability**: Langfuse tracing (when keys are set)
+- **UI**: Patient selector, quick prompt buttons, tool badges, feedback buttons, editable discharge drafts
+
+## Bounty Features
+
+### New Data Source: DailyMed (NLM/NIH)
+FDA-approved drug labeling data fetched from the [DailyMed REST API](https://dailymed.nlm.nih.gov/dailymed/app-support-web-services.cfm). Integrated into discharge instructions for patient-friendly drug education with side effects, warnings, and proper citations.
+
+### 5 Bounty Tools
+1. **get_encounter_data** — Retrieve hospital encounter/admission details
+2. **reconcile_medications** — Compare admission vs. discharge medications, flag changes
+3. **draft_discharge_summary** — AI-generated comprehensive discharge summary
+4. **generate_discharge_instructions** — Patient-friendly instructions with DailyMed drug education + scheduled follow-up appointments
+5. **save_to_chart** — Stateful document CRUD with draft/finalize workflow
+
+### Editable Discharge Drafts
+Practitioners can review and edit AI-drafted discharge notes before finalizing. Edit Draft button opens an editable textarea; Save Edit persists changes; Finalize locks the document to the chart.
+
+### Scheduled Appointments
+Discharge instructions include actual scheduled follow-up appointments with provider name, specialty, date, time, and location.
 
 ## FHIR Data Source (OpenEMR Docker)
 
@@ -41,38 +94,6 @@ To use real patient data from OpenEMR:
 
 For iframe embedding from OpenEMR, set `OPENEMR_ORIGINS=https://localhost:8300` (or your OpenEMR origin). The chat UI reads `?pid=` from the URL to auto-select the patient.
 
-## Architecture
-
-- **Agent**: LangChain.js + Claude Sonnet 4, tool-calling
-- **Tools**: get_patient_summary, get_medications, drug_interaction_check, allergy_check, get_lab_results
-- **Data**: Mock JSON (DATA_SOURCE=mock) or OpenEMR FHIR API (when Docker is up)
-- **Verification**: Drug interaction severity gate, source citation, medical disclaimer
-- **Observability**: Langfuse (when keys are set)
-
-## Evals
-
-53 test cases validate correctness, safety, and tool routing. See [evals.md](evals.md) for the full eval framework docs.
-
-```bash
-npx tsx eval/run-eval.ts
-```
-
-![Eval Results](docs/eval-results.gif)
-
-![Eval Harness](docs/mvp-05-eval-harness.gif)
-
-| Category | Result |
-|----------|--------|
-| **Golden Sets** | 10/10 (100%) |
-| multi_tool | 5/5 |
-| query_variation | 8/8 |
-| drug_interactions | 5/5 |
-| complex_query | 4/4 |
-| edge_case | 4/8 |
-| adversarial | 4/6 |
-| safety | 4/7 |
-| **Total** | **44/53 (83%)** |
-
 ## Security
 
 See [SECURITY.md](SECURITY.md) for the full security audit and remediation checklist. The current MVP runs with mock data — all identified issues must be resolved before connecting to real patient data.
@@ -80,11 +101,14 @@ See [SECURITY.md](SECURITY.md) for the full security audit and remediation check
 ## MVP Requirements
 
 - [x] Agent responds to NL queries in healthcare domain
-- [x] 3+ functional tools
+- [x] 3+ functional tools (10 implemented)
 - [x] Tool calls execute and return structured results
 - [x] Agent synthesizes tool results
 - [x] Conversation history maintained
 - [x] Basic error handling
-- [x] Domain-specific verification (drug interaction severity)
-- [x] 5+ eval test cases
+- [x] Domain-specific verification (drug interaction severity gate)
+- [x] 50+ eval test cases (79 implemented)
 - [x] Deployed and publicly accessible (Railway)
+- [x] BOUNTY.md with customer, features, data source, impact
+- [x] New data source (DailyMed REST API)
+- [x] Stateful CRUD operations (document draft/edit/finalize)
