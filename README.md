@@ -4,6 +4,38 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 **Live Demo:** https://agent-production-6f7a.up.railway.app
 
+## Architecture
+
+![Architecture Diagram](docs/architecture-diagram.svg)
+
+**Agent:** LangChain.js + Claude Sonnet 4 using `createToolCallingAgent` with native tool-calling. The agent reasons over clinical queries, selects from 10 tools, executes multi-step workflows (up to 10 iterations), and synthesizes results with source attribution and safety verification.
+
+**10 Tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `get_patient_summary` | Demographics, conditions, medications, allergies, vitals |
+| `get_medications` | Active medication list with dose, frequency, prescriber |
+| `drug_interaction_check` | Pairwise interaction check with severity gating |
+| `allergy_check` | Direct + cross-reactivity allergy matching |
+| `get_lab_results` | Lab values with normal/abnormal/critical flags |
+| `get_encounter_data` | Hospital encounters, diagnoses, procedures, course notes |
+| `reconcile_medications` | Admission vs. discharge medication comparison |
+| `draft_discharge_summary` | Multi-source aggregation into structured clinician-facing summary |
+| `generate_discharge_instructions` | Patient-facing instructions + DailyMed education + appointments |
+| `save_to_chart` | Stateful document CRUD with draft/finalize workflow |
+
+**Data Sources:**
+- **Mock JSON** or **OpenEMR FHIR R4** — Patient data via configurable `DATA_SOURCE` env var
+- **DailyMed REST API** (NLM/NIH) — FDA-approved drug labeling for patient education
+- **OpenFDA** — Drug interaction label data
+
+**Verification Layer:** Post-LLM safety checks on every response — drug interaction severity gate, allergy conflict detection, critical lab flagging, medication change alerts, source attribution, and medical disclaimer.
+
+**Observability:** Langfuse tracing with per-request spans, session grouping, and feedback correlation.
+
+> See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture documentation.
+
 ## Demo
 
 ### Patient Selection + Quick Prompts
@@ -58,6 +90,24 @@ Patient-friendly instructions with DailyMed drug education, warning signs, and a
 
 See [evals.md](evals.md) for the full eval framework docs.
 
+## Bounty Features
+
+### New Data Source: DailyMed (NLM/NIH)
+FDA-approved drug labeling data fetched from the [DailyMed REST API](https://dailymed.nlm.nih.gov/dailymed/app-support-web-services.cfm). Integrated into discharge instructions for patient-friendly drug education with side effects, warnings, and proper citations.
+
+### 5 Bounty Tools
+1. **get_encounter_data** — Retrieve hospital encounter/admission details
+2. **reconcile_medications** — Compare admission vs. discharge medications, flag changes
+3. **draft_discharge_summary** — AI-generated comprehensive discharge summary
+4. **generate_discharge_instructions** — Patient-friendly instructions with DailyMed drug education + scheduled follow-up appointments
+5. **save_to_chart** — Stateful document CRUD with draft/finalize workflow
+
+### Editable Discharge Drafts
+Practitioners can review and edit AI-drafted discharge notes before finalizing. Edit Draft button opens an editable textarea; Save Edit persists changes; Finalize locks the document to the chart.
+
+### Scheduled Appointments
+Discharge instructions include actual scheduled follow-up appointments with provider name, specialty, date, time, and location.
+
 ## Setup
 
 ```bash
@@ -83,34 +133,6 @@ Open http://localhost:3000 (local) or https://agent-production-6f7a.up.railway.a
 npm test       # Run 232 unit tests (Vitest)
 npm run eval   # Run 79 eval cases (requires ANTHROPIC_API_KEY)
 ```
-
-## Architecture
-
-- **Agent**: LangChain.js + Claude Sonnet 4, tool-calling with `createToolCallingAgent`
-- **10 Tools**: get_patient_summary, get_medications, drug_interaction_check, allergy_check, get_lab_results, get_encounter_data, reconcile_medications, draft_discharge_summary, generate_discharge_instructions, save_to_chart
-- **Data Sources**: Mock JSON (DATA_SOURCE=mock) or OpenEMR FHIR R4 API (DATA_SOURCE=fhir) + DailyMed REST API (NLM/NIH) for drug education
-- **Stateful CRUD**: Documents with create/read/update/finalize — editable drafts with clinician review before finalization
-- **Verification**: Drug interaction severity gate, source attribution, medical disclaimer
-- **Observability**: Langfuse tracing (when keys are set)
-- **UI**: Patient selector, quick prompt buttons, tool badges, feedback buttons, editable discharge drafts
-
-## Bounty Features
-
-### New Data Source: DailyMed (NLM/NIH)
-FDA-approved drug labeling data fetched from the [DailyMed REST API](https://dailymed.nlm.nih.gov/dailymed/app-support-web-services.cfm). Integrated into discharge instructions for patient-friendly drug education with side effects, warnings, and proper citations.
-
-### 5 Bounty Tools
-1. **get_encounter_data** — Retrieve hospital encounter/admission details
-2. **reconcile_medications** — Compare admission vs. discharge medications, flag changes
-3. **draft_discharge_summary** — AI-generated comprehensive discharge summary
-4. **generate_discharge_instructions** — Patient-friendly instructions with DailyMed drug education + scheduled follow-up appointments
-5. **save_to_chart** — Stateful document CRUD with draft/finalize workflow
-
-### Editable Discharge Drafts
-Practitioners can review and edit AI-drafted discharge notes before finalizing. Edit Draft button opens an editable textarea; Save Edit persists changes; Finalize locks the document to the chart.
-
-### Scheduled Appointments
-Discharge instructions include actual scheduled follow-up appointments with provider name, specialty, date, time, and location.
 
 ## FHIR Data Source (OpenEMR Docker)
 
