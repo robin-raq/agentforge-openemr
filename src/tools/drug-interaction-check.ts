@@ -125,7 +125,7 @@ export function drugInteractionCheck() {
                 }
               } catch (err) {
                 // QUAL-002: Log FDA API failures instead of silently swallowing
-                console.warn(`OpenFDA lookup failed for pair [${meds[i]}, ${meds[j]}]:`, err);
+                console.warn(`OpenFDA lookup failed for pair [${drug1}, ${drug2}]:`, err);
               }
             }
           }
