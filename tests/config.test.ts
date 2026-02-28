@@ -112,6 +112,66 @@ describe("config", () => {
     });
   });
 
+  describe("isPlaceholderKey (SEC-006)", () => {
+    it("detects '...' placeholder", async () => {
+      const { isPlaceholderKey } = await import("../src/config");
+      expect(isPlaceholderKey("sk-ant-...")).toBe(true);
+    });
+
+    it("detects 'changeme' placeholder", async () => {
+      const { isPlaceholderKey } = await import("../src/config");
+      expect(isPlaceholderKey("changeme")).toBe(true);
+      expect(isPlaceholderKey("CHANGEME")).toBe(true);
+    });
+
+    it("detects 'placeholder' in key", async () => {
+      const { isPlaceholderKey } = await import("../src/config");
+      expect(isPlaceholderKey("my_placeholder_key")).toBe(true);
+    });
+
+    it("detects '<your' pattern", async () => {
+      const { isPlaceholderKey } = await import("../src/config");
+      expect(isPlaceholderKey("<your-api-key-here>")).toBe(true);
+    });
+
+    it("detects 'xxx' pattern", async () => {
+      const { isPlaceholderKey } = await import("../src/config");
+      expect(isPlaceholderKey("xxx")).toBe(true);
+    });
+
+    it("does not flag real API keys", async () => {
+      const { isPlaceholderKey } = await import("../src/config");
+      expect(isPlaceholderKey("sk-ant-api03-real-key-1234567890")).toBe(false);
+      expect(isPlaceholderKey("pk-lf-abc123def456")).toBe(false);
+    });
+  });
+
+  describe("PORT validation (SEC-006)", () => {
+    it("falls back to 3000 for NaN PORT", async () => {
+      process.env.PORT = "not-a-number";
+      const { PORT } = await import("../src/config");
+      expect(PORT).toBe(3000);
+    });
+
+    it("falls back to 3000 for PORT out of range (0)", async () => {
+      process.env.PORT = "0";
+      const { PORT } = await import("../src/config");
+      expect(PORT).toBe(3000);
+    });
+
+    it("falls back to 3000 for PORT out of range (99999)", async () => {
+      process.env.PORT = "99999";
+      const { PORT } = await import("../src/config");
+      expect(PORT).toBe(3000);
+    });
+
+    it("accepts valid PORT", async () => {
+      process.env.PORT = "8080";
+      const { PORT } = await import("../src/config");
+      expect(PORT).toBe(8080);
+    });
+  });
+
   describe("warnInsecureTls", () => {
     it("logs warning when NODE_TLS_REJECT_UNAUTHORIZED is 0", async () => {
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";

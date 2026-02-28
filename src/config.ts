@@ -58,8 +58,22 @@ export function getDataSource(): DataSource {
   return cachedDataSource;
 }
 
-function isPlaceholderKey(key: string): boolean {
-  return key.includes("...");
+// SEC-006: Stronger placeholder detection for secrets
+export function isPlaceholderKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  return (
+    key.includes("...") ||
+    lower.includes("changeme") ||
+    lower.includes("placeholder") ||
+    lower.includes("<your") ||
+    lower.includes("your_") ||
+    lower.includes("replace_me") ||
+    lower === "xxx" ||
+    lower === "xxxx" ||
+    lower.includes("todo") ||
+    lower.includes("insert_") ||
+    lower.includes("sk-ant-placeholder")
+  );
 }
 
 export function getAnthropicApiKey(): string {
@@ -70,7 +84,9 @@ export function getAnthropicApiKey(): string {
   return key;
 }
 
-export const PORT = parseInt(process.env.PORT || "3000", 10);
+// SEC-006: PORT bounds validation
+const parsedPort = parseInt(process.env.PORT || "3000", 10);
+export const PORT = Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535 ? 3000 : parsedPort;
 
 let langfuseInitialized = false;
 

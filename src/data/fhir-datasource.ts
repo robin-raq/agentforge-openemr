@@ -10,6 +10,7 @@ import { FhirAuthManager, FHIR_SCOPES } from "./fhir-auth";
 import { PatientIdResolver } from "./patient-id-resolver";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FHIR_TIMEOUT_MS = 10_000;
 
 export interface FhirDataSourceConfig {
   fhirBaseUrl: string;
@@ -61,14 +62,7 @@ export class FhirDataSource implements DataSource {
       if (bundle.entry?.[0]?.resource?.id) {
         return bundle.entry[0].resource.id;
       }
-      // Last resort: list all patients and match by position (pid=1 → first patient)
-      const allBundle = await this.fhirFetch<{ entry?: Array<{ resource: { id: string } }> }>(
-        `/Patient?_count=100`
-      );
-      const idx = parseInt(pid, 10) - 1;
-      if (allBundle.entry?.[idx]?.resource?.id) {
-        return allBundle.entry[idx].resource.id;
-      }
+      // SEC-002: Removed "last resort" all-patients fetch to prevent IDOR/enumeration
       throw new Error(`Patient not found: ${pid}`);
     }
   }
@@ -77,12 +71,27 @@ export class FhirDataSource implements DataSource {
     const token = await this.auth.getAccessToken();
     const url = `${this.fhirBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/fhir+json",
-      },
-    });
+    // SEC-005: AbortController timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FHIR_TIMEOUT_MS);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/fhir+json",
+        },
+        signal: controller.signal,
+      });
+    } catch (err: unknown) {
+      clearTimeout(timeout);
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new Error("FHIR request timed out");
+      }
+      throw err;
+    }
+    clearTimeout(timeout);
 
     if (!res.ok) {
       if (res.status === 401) {
@@ -91,8 +100,10 @@ export class FhirDataSource implements DataSource {
       if (res.status === 404) {
         throw new Error("Resource not found");
       }
+      // SEC-008: Log details internally, throw generic message
       const text = await res.text();
-      throw new Error(`FHIR request failed: ${res.status} ${text}`);
+      console.error(`FHIR error details [${res.status}]:`, text);
+      throw new Error(`FHIR request failed: ${res.status}`);
     }
 
     return res.json() as Promise<T>;
@@ -202,8 +213,10 @@ export class FhirDataSource implements DataSource {
     });
 
     if (!res.ok) {
+      // SEC-008: Log details internally, throw generic message
       const text = await res.text();
-      throw new Error(`FHIR DocumentReference create failed: ${res.status} ${text}`);
+      console.error(`FHIR DocumentReference create error [${res.status}]:`, text);
+      throw new Error(`FHIR DocumentReference create failed: ${res.status}`);
     }
 
     const created = (await res.json()) as { id?: string };
@@ -281,8 +294,10 @@ export class FhirDataSource implements DataSource {
     });
 
     if (!res.ok) {
+      // SEC-008: Log details internally, throw generic message
       const text = await res.text();
-      throw new Error(`FHIR DocumentReference update failed: ${res.status} ${text}`);
+      console.error(`FHIR DocumentReference update error [${res.status}]:`, text);
+      throw new Error(`FHIR DocumentReference update failed: ${res.status}`);
     }
 
     return merged;
