@@ -36,6 +36,19 @@
       font-size: 0.7rem;
       font-weight: 500;
     }
+    .new-chat-btn {
+      padding: 0.375rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 0.8125rem;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .new-chat-btn:hover { background: rgba(255,255,255,0.3); }
     .patient-selector {
       display: flex;
       align-items: center;
@@ -172,6 +185,13 @@
       border-left-color: #ef4444;
     }
 
+    .message-timing {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 0.375rem;
+      padding-top: 0.375rem;
+      border-top: 1px solid #f1f5f9;
+    }
     .feedback-row {
       display: flex;
       gap: 0.375rem;
@@ -269,6 +289,293 @@
     footer a { color: #64748b; text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
+    /* Observability Sidebar */
+    .obs-toggle {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 200;
+      background: #1F4E79;
+      color: white;
+      border: none;
+      border-radius: 8px 0 0 8px;
+      padding: 0.5rem 0.375rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: 0.05em;
+      font-family: inherit;
+      font-weight: 600;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.12);
+      transition: right 0.3s;
+    }
+    .obs-toggle:hover { background: #163a5c; }
+    .obs-toggle.open { right: 320px; }
+
+    .obs-sidebar {
+      position: fixed;
+      right: -320px;
+      top: 0;
+      width: 320px;
+      height: 100vh;
+      background: #f8fafc;
+      border-left: 1px solid #e2e8f0;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+      z-index: 199;
+      overflow-y: auto;
+      transition: right 0.3s;
+      display: flex;
+      flex-direction: column;
+    }
+    .obs-sidebar.open { right: 0; }
+
+    .obs-header {
+      padding: 1rem;
+      background: linear-gradient(135deg, #1F4E79 0%, #2563eb 100%);
+      color: white;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .obs-header-title { display: flex; align-items: center; gap: 0.5rem; }
+
+    .obs-section {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .obs-section-title {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.625rem;
+    }
+
+    .obs-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .obs-stat-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.625rem;
+      text-align: center;
+    }
+    .obs-stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1;
+    }
+    .obs-stat-value.error { color: #ef4444; }
+    .obs-stat-value.warn { color: #f59e0b; }
+    .obs-stat-label {
+      font-size: 0.6875rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+
+    .obs-tool-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.375rem;
+      font-size: 0.75rem;
+    }
+    .obs-tool-name {
+      width: 110px;
+      flex-shrink: 0;
+      color: #475569;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .obs-tool-bar-bg {
+      flex: 1;
+      height: 14px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .obs-tool-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb, #1F4E79);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+      min-width: 2px;
+    }
+    .obs-tool-count {
+      width: 28px;
+      flex-shrink: 0;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 0.6875rem;
+    }
+
+    .obs-debug {
+      font-size: 0.75rem;
+      color: #475569;
+    }
+    .obs-debug-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.25rem 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .obs-debug-label { color: #94a3b8; }
+    .obs-debug-value { font-weight: 500; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.6875rem; }
+
+    .obs-error-log {
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 0.6875rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #ef4444;
+      background: #fef2f2;
+      border-radius: 6px;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .obs-error-entry {
+      padding: 0.2rem 0;
+      border-bottom: 1px dashed #fecaca;
+    }
+    .obs-error-entry:last-child { border-bottom: none; }
+    .obs-no-data {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.75rem;
+      padding: 1rem 0;
+      font-style: italic;
+    }
+
+    /* Performance Targets */
+    .perf-target-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.75rem;
+    }
+    .perf-target-row:last-child { border-bottom: none; }
+    .perf-icon { font-size: 0.8125rem; flex-shrink: 0; }
+    .perf-label { flex: 1; color: #475569; }
+    .perf-value {
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.6875rem;
+    }
+    .perf-value.met { color: #16a34a; }
+    .perf-value.unmet { color: #ef4444; }
+    .perf-value.pending { color: #94a3b8; }
+    .perf-target-bar {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.125rem;
+    }
+    .perf-target-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .perf-target-fill.met { background: #16a34a; }
+    .perf-target-fill.unmet { background: #ef4444; }
+    .perf-target-fill.partial { background: #f59e0b; }
+    .perf-score {
+      text-align: center;
+      padding: 0.625rem;
+      margin-bottom: 0.5rem;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .perf-score-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .perf-score-value.good { color: #16a34a; }
+    .perf-score-value.ok { color: #f59e0b; }
+    .perf-score-value.bad { color: #ef4444; }
+    .perf-score-label {
+      font-size: 0.6875rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+
+    /* Structured Result panel */
+    .structured-result {
+      margin-top: 0.375rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      cursor: pointer;
+    }
+    .structured-result-content {
+      display: none;
+      margin-top: 0.25rem;
+      padding: 0.625rem;
+      background: #1e293b;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.7rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+    .structured-result.open .structured-result-content { display: block; }
+    .sr-key { color: #94a3b8; }
+    .sr-string { color: #34d399; }
+    .sr-number { color: #f59e0b; }
+    .sr-bool-true { color: #34d399; }
+    .sr-bool-false { color: #f87171; }
+    .sr-badge {
+      display: inline-block;
+      padding: 0.125rem 0.375rem;
+      border-radius: 3px;
+      font-size: 0.625rem;
+      font-weight: 600;
+      margin-right: 0.25rem;
+    }
+    .sr-badge.sources { background: #1e3a5f; color: #7dd3fc; }
+    .sr-badge.grounded { background: #14532d; color: #86efac; }
+    .sr-badge.domain { background: #14532d; color: #86efac; }
+    .sr-badge.escalation { background: #7f1d1d; color: #fca5a5; }
+    .sr-badge.valid { background: #14532d; color: #86efac; }
+    .sr-badge.confidence-high { background: #14532d; color: #86efac; }
+    .sr-badge.confidence-med { background: #78350f; color: #fde68a; }
+    .sr-badge.confidence-low { background: #7f1d1d; color: #fca5a5; }
+    .confidence-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      margin-left: 0.375rem;
+    }
+    .confidence-pill.high { background: #dcfce7; color: #166534; }
+    .confidence-pill.med { background: #fef3c7; color: #92400e; }
+    .confidence-pill.low { background: #fee2e2; color: #991b1b; }
+    .sr-badges {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+
     .doc-actions {
       display: flex;
       gap: 0.5rem;
@@ -332,6 +639,7 @@
       <span class="badge">Clinical Query Agent</span>
     </div>
     <div class="patient-selector">
+      <button class="new-chat-btn" id="new-chat-btn" title="Start a new conversation">+ New Chat</button>
       <label for="patient-select">Patient:</label>
       <select id="patient-select">
         <option value="">Select patient...</option>
@@ -374,8 +682,396 @@
     Built for <a href="https://gauntletai.com" target="_blank">Gauntlet AI</a>
   </footer>
 
+  <!-- Observability Sidebar -->
+  <button class="obs-toggle" id="obs-toggle">Observability</button>
+  <aside class="obs-sidebar" id="obs-sidebar">
+    <div class="obs-header">
+      <div class="obs-header-title">Agent Observability</div>
+    </div>
+
+    <div class="obs-section">
+      <div class="obs-section-title">Aggregate Stats</div>
+      <div class="obs-stats-grid">
+        <div class="obs-stat-card">
+          <div class="obs-stat-value" id="obs-requests">0</div>
+          <div class="obs-stat-label">Requests</div>
+        </div>
+        <div class="obs-stat-card">
+          <div class="obs-stat-value error" id="obs-errors">0</div>
+          <div class="obs-stat-label">Errors</div>
+        </div>
+        <div class="obs-stat-card">
+          <div class="obs-stat-value" id="obs-avg-latency">—</div>
+          <div class="obs-stat-label">Avg Response</div>
+        </div>
+        <div class="obs-stat-card">
+          <div class="obs-stat-value warn" id="obs-safety-alerts">0</div>
+          <div class="obs-stat-label">Safety Alerts</div>
+        </div>
+        <div class="obs-stat-card">
+          <div class="obs-stat-value" id="obs-avg-confidence">—</div>
+          <div class="obs-stat-label">Avg Confidence</div>
+        </div>
+        <div class="obs-stat-card">
+          <div class="obs-stat-value" id="obs-tool-success-rate">—</div>
+          <div class="obs-stat-label">Tool Success</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="obs-section">
+      <div class="obs-section-title">Tool Usage</div>
+      <div id="obs-tool-usage">
+        <div class="obs-no-data">No tool usage recorded yet</div>
+      </div>
+    </div>
+
+    <div class="obs-section">
+      <div class="obs-section-title">Performance Targets</div>
+      <div id="obs-perf-targets">
+        <div class="perf-score">
+          <div class="perf-score-value pending" id="perf-score">—</div>
+          <div class="perf-score-label">Targets Met</div>
+        </div>
+        <div class="perf-target-row">
+          <span class="perf-icon" id="perf-icon-latency1">&#x23F3;</span>
+          <span class="perf-label">Single-tool &lt;5s</span>
+          <span class="perf-value pending" id="perf-val-latency1">—</span>
+        </div>
+        <div class="perf-target-row">
+          <span class="perf-icon" id="perf-icon-latency3">&#x23F3;</span>
+          <span class="perf-label">Multi-step &lt;15s</span>
+          <span class="perf-value pending" id="perf-val-latency3">—</span>
+        </div>
+        <div class="perf-target-row">
+          <span class="perf-icon" id="perf-icon-toolsuccess">&#x23F3;</span>
+          <span class="perf-label">Tool success &gt;95%</span>
+          <span class="perf-value pending" id="perf-val-toolsuccess">—</span>
+        </div>
+        <div class="perf-target-row">
+          <span class="perf-icon" id="perf-icon-halluc">&#x23F3;</span>
+          <span class="perf-label">Hallucination &lt;5%</span>
+          <span class="perf-value pending" id="perf-val-halluc">—</span>
+        </div>
+        <div class="perf-target-row">
+          <span class="perf-icon" id="perf-icon-verify">&#x23F3;</span>
+          <span class="perf-label">Verification &gt;90%</span>
+          <span class="perf-value pending" id="perf-val-verify">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="obs-section">
+      <div class="obs-section-title">System Debug</div>
+      <div class="obs-debug" id="obs-debug">
+        <div class="obs-debug-row">
+          <span class="obs-debug-label">Session ID</span>
+          <span class="obs-debug-value" id="obs-session-id">—</span>
+        </div>
+        <div class="obs-debug-row">
+          <span class="obs-debug-label">Total Tools</span>
+          <span class="obs-debug-value" id="obs-total-tools">0</span>
+        </div>
+        <div class="obs-debug-row">
+          <span class="obs-debug-label">Avg Tool Time</span>
+          <span class="obs-debug-value" id="obs-avg-tool-time">—</span>
+        </div>
+      </div>
+      <div class="obs-error-log" id="obs-error-log" style="display:none;"></div>
+    </div>
+  </aside>
+
   <script>
-    const sessionId = 'session-' + crypto.randomUUID();
+    // Session persistence: reuse session_id across page reloads via localStorage
+    const SESSION_KEY = 'agentforge_session_id';
+    const sessionId = localStorage.getItem(SESSION_KEY) || 'session-' + crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, sessionId);
+
+    // --- Observability Tracker (persisted to localStorage per session) ---
+    const OBS_STORAGE_KEY = 'agentforge_obs_' + sessionId;
+
+    const obsTracker = {
+      requests: 0,
+      errors: 0,
+      latencies: [],
+      toolUsage: {},  // tool_name -> count
+      toolLatencies: [], // all tool durations in ms
+      safetyAlerts: 0,
+      recentErrors: [],
+      responseLog: [], // per-response metadata for persistence
+      confidenceScores: [],  // all confidence scores for avg computation
+      // Performance target tracking
+      perf: {
+        singleToolLatencies: [],  // latencies for 1-tool queries
+        multiStepLatencies: [],   // latencies for 3+ tool queries
+        toolExpected: 0,          // total expected tool calls
+        toolSucceeded: 0,         // total successful tool calls
+        hallucinationCount: 0,    // must_not_contain violations (scope warnings)
+        verificationCorrect: 0,   // correct verification flags
+        totalVerified: 0          // total verified responses
+      },
+      save: function() {
+        try {
+          localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify({
+            requests: this.requests,
+            errors: this.errors,
+            latencies: this.latencies,
+            toolUsage: this.toolUsage,
+            toolLatencies: this.toolLatencies,
+            safetyAlerts: this.safetyAlerts,
+            recentErrors: this.recentErrors,
+            responseLog: this.responseLog,
+            confidenceScores: this.confidenceScores,
+            perf: this.perf
+          }));
+        } catch (e) { /* localStorage full or unavailable */ }
+      },
+      load: function() {
+        try {
+          var raw = localStorage.getItem(OBS_STORAGE_KEY);
+          if (!raw) return;
+          var d = JSON.parse(raw);
+          this.requests = d.requests || 0;
+          this.errors = d.errors || 0;
+          this.latencies = d.latencies || [];
+          this.toolUsage = d.toolUsage || {};
+          this.toolLatencies = d.toolLatencies || [];
+          this.safetyAlerts = d.safetyAlerts || 0;
+          this.recentErrors = d.recentErrors || [];
+          this.responseLog = d.responseLog || [];
+          this.confidenceScores = d.confidenceScores || [];
+          if (d.perf) {
+            this.perf.singleToolLatencies = d.perf.singleToolLatencies || [];
+            this.perf.multiStepLatencies = d.perf.multiStepLatencies || [];
+            this.perf.toolExpected = d.perf.toolExpected || 0;
+            this.perf.toolSucceeded = d.perf.toolSucceeded || 0;
+            this.perf.hallucinationCount = d.perf.hallucinationCount || 0;
+            this.perf.verificationCorrect = d.perf.verificationCorrect || 0;
+            this.perf.totalVerified = d.perf.totalVerified || 0;
+          }
+          this.render();
+        } catch (e) { /* corrupt data — start fresh */ }
+      },
+      record: function(data, error) {
+        this.requests++;
+        if (error) {
+          this.errors++;
+          this.recentErrors.push({ time: new Date().toLocaleTimeString(), msg: String(error).slice(0, 100) });
+          if (this.recentErrors.length > 10) this.recentErrors.shift();
+        }
+        if (data && data.timing && data.timing.total_ms) {
+          this.latencies.push(data.timing.total_ms);
+        }
+        if (data && data.tool_calls) {
+          data.tool_calls.forEach(function(tc) {
+            obsTracker.toolUsage[tc.name] = (obsTracker.toolUsage[tc.name] || 0) + 1;
+          });
+        }
+        if (data && data.timing && data.timing.tool_traces) {
+          data.timing.tool_traces.forEach(function(t) {
+            obsTracker.toolLatencies.push(t.duration_ms);
+          });
+        }
+        if (data && data.verification_flags && data.verification_flags.length > 0) {
+          this.safetyAlerts += data.verification_flags.length;
+        }
+        // Performance target tracking from server response
+        if (data && data.performance) {
+          var p = data.performance;
+          var tc = p.tool_count || 0;
+          if (tc === 1) this.perf.singleToolLatencies.push(p.latency_ms);
+          if (tc >= 3) this.perf.multiStepLatencies.push(p.latency_ms);
+          if (tc > 0) {
+            this.perf.toolExpected++;
+            if (p.tool_success) this.perf.toolSucceeded++;
+          }
+          if (p.has_scope_warning) this.perf.hallucinationCount++;
+          // Verification: response is valid if no scope warning and has sources when tools used
+          this.perf.totalVerified++;
+          if (!p.has_scope_warning) this.perf.verificationCorrect++;
+        }
+        // Track confidence score
+        if (data.structured_result && data.structured_result.confidence_score != null) {
+          this.confidenceScores.push(data.structured_result.confidence_score);
+        }
+        // Persist per-response metadata for reload
+        if (data) {
+          this.responseLog.push({
+            tool_calls: data.tool_calls || [],
+            timing: data.timing || null,
+            verification_flags: data.verification_flags || [],
+            structured_result: data.structured_result || null,
+            performance: data.performance || null
+          });
+        }
+        this.save();
+        this.render();
+      },
+      avgLatency: function() {
+        if (this.latencies.length === 0) return null;
+        var sum = this.latencies.reduce(function(a, b) { return a + b; }, 0);
+        return Math.round(sum / this.latencies.length);
+      },
+      avgToolTime: function() {
+        if (this.toolLatencies.length === 0) return null;
+        var sum = this.toolLatencies.reduce(function(a, b) { return a + b; }, 0);
+        return Math.round(sum / this.toolLatencies.length);
+      },
+      render: function() {
+        document.getElementById('obs-requests').textContent = this.requests;
+        document.getElementById('obs-errors').textContent = this.errors;
+        document.getElementById('obs-safety-alerts').textContent = this.safetyAlerts;
+
+        // Avg confidence
+        var avgConfEl = document.getElementById('obs-avg-confidence');
+        if (this.confidenceScores.length > 0) {
+          var avgConf = this.confidenceScores.reduce(function(a, b) { return a + b; }, 0) / this.confidenceScores.length;
+          var confPct = Math.round(avgConf * 100);
+          avgConfEl.textContent = confPct + '%';
+          avgConfEl.className = 'obs-stat-value' + (confPct >= 70 ? '' : confPct >= 40 ? ' warn' : ' error');
+        } else {
+          avgConfEl.textContent = '\u2014';
+        }
+
+        // Tool success rate
+        var toolSuccessEl = document.getElementById('obs-tool-success-rate');
+        if (this.perf.toolExpected > 0) {
+          var tsRate = Math.round((this.perf.toolSucceeded / this.perf.toolExpected) * 100);
+          toolSuccessEl.textContent = tsRate + '%';
+          toolSuccessEl.className = 'obs-stat-value' + (tsRate >= 95 ? '' : ' error');
+        } else {
+          toolSuccessEl.textContent = '\u2014';
+        }
+
+        var avg = this.avgLatency();
+        var avgEl = document.getElementById('obs-avg-latency');
+        avgEl.textContent = avg != null ? (avg >= 1000 ? (avg / 1000).toFixed(1) + 's' : avg + 'ms') : '\u2014';
+
+        var avgTool = this.avgToolTime();
+        document.getElementById('obs-avg-tool-time').textContent =
+          avgTool != null ? (avgTool >= 1000 ? (avgTool / 1000).toFixed(1) + 's' : avgTool + 'ms') : '\u2014';
+        document.getElementById('obs-total-tools').textContent =
+          this.toolLatencies.length;
+
+        // Tool usage bars
+        var usageDiv = document.getElementById('obs-tool-usage');
+        var entries = Object.entries(this.toolUsage);
+        if (entries.length === 0) {
+          usageDiv.innerHTML = '<div class="obs-no-data">No tool usage recorded yet</div>';
+        } else {
+          entries.sort(function(a, b) { return b[1] - a[1]; });
+          var maxCount = entries[0][1];
+          var html = '';
+          entries.forEach(function(e) {
+            var name = TOOL_LABELS[e[0]] || e[0];
+            var count = e[1];
+            var pct = Math.round((count / maxCount) * 100);
+            html += '<div class="obs-tool-row">' +
+              '<span class="obs-tool-name" title="' + name + '">' + name + '</span>' +
+              '<div class="obs-tool-bar-bg"><div class="obs-tool-bar" style="width:' + pct + '%"></div></div>' +
+              '<span class="obs-tool-count">' + count + '</span>' +
+              '</div>';
+          });
+          usageDiv.innerHTML = html;
+        }
+
+        // Error log
+        var errorLog = document.getElementById('obs-error-log');
+        if (this.recentErrors.length > 0) {
+          errorLog.style.display = 'block';
+          errorLog.innerHTML = this.recentErrors.map(function(e) {
+            return '<div class="obs-error-entry">' + e.time + ': ' + e.msg + '</div>';
+          }).join('');
+        } else {
+          errorLog.style.display = 'none';
+        }
+
+        // Performance targets
+        this.renderPerformance();
+      },
+      renderPerformance: function() {
+        var p = this.perf;
+        var targetsMet = 0;
+        var targetsTotal = 5;
+
+        // Helper: update a target row
+        function setTarget(id, value, met) {
+          var valEl = document.getElementById('perf-val-' + id);
+          var iconEl = document.getElementById('perf-icon-' + id);
+          if (!valEl || !iconEl) return;
+          valEl.textContent = value;
+          valEl.className = 'perf-value ' + (met === null ? 'pending' : met ? 'met' : 'unmet');
+          iconEl.textContent = met === null ? '\u23F3' : met ? '\u2705' : '\u274C';
+        }
+
+        // 1. Single-tool latency <5s
+        if (p.singleToolLatencies.length > 0) {
+          var avgSingle = p.singleToolLatencies.reduce(function(a, b) { return a + b; }, 0) / p.singleToolLatencies.length;
+          var met1 = avgSingle < 5000;
+          if (met1) targetsMet++;
+          setTarget('latency1', (avgSingle / 1000).toFixed(1) + 's', met1);
+        } else {
+          setTarget('latency1', '\u2014', null);
+        }
+
+        // 2. Multi-step latency <15s
+        if (p.multiStepLatencies.length > 0) {
+          var avgMulti = p.multiStepLatencies.reduce(function(a, b) { return a + b; }, 0) / p.multiStepLatencies.length;
+          var met2 = avgMulti < 15000;
+          if (met2) targetsMet++;
+          setTarget('latency3', (avgMulti / 1000).toFixed(1) + 's', met2);
+        } else {
+          setTarget('latency3', '\u2014', null);
+        }
+
+        // 3. Tool success >95%
+        if (p.toolExpected > 0) {
+          var successRate = (p.toolSucceeded / p.toolExpected) * 100;
+          var met3 = successRate >= 95;
+          if (met3) targetsMet++;
+          setTarget('toolsuccess', successRate.toFixed(0) + '%', met3);
+        } else {
+          setTarget('toolsuccess', '\u2014', null);
+        }
+
+        // 4. Hallucination <5%
+        if (this.requests > 0) {
+          var hallucRate = (p.hallucinationCount / this.requests) * 100;
+          var met4 = hallucRate < 5;
+          if (met4) targetsMet++;
+          setTarget('halluc', hallucRate.toFixed(1) + '%', met4);
+        } else {
+          setTarget('halluc', '\u2014', null);
+        }
+
+        // 5. Verification >90%
+        if (p.totalVerified > 0) {
+          var verifyRate = (p.verificationCorrect / p.totalVerified) * 100;
+          var met5 = verifyRate >= 90;
+          if (met5) targetsMet++;
+          setTarget('verify', verifyRate.toFixed(0) + '%', met5);
+        } else {
+          setTarget('verify', '\u2014', null);
+        }
+
+        // Overall score
+        var scoreEl = document.getElementById('perf-score');
+        if (this.requests > 0) {
+          scoreEl.textContent = targetsMet + '/' + targetsTotal;
+          scoreEl.className = 'perf-score-value ' + (targetsMet >= 4 ? 'good' : targetsMet >= 2 ? 'ok' : 'bad');
+        } else {
+          scoreEl.textContent = '\u2014';
+          scoreEl.className = 'perf-score-value pending';
+        }
+      }
+    };
+
+    // Toggle sidebar
+    document.getElementById('obs-toggle').addEventListener('click', function() {
+      document.getElementById('obs-sidebar').classList.toggle('open');
+      this.classList.toggle('open');
+    });
+
     const chatContainer = document.getElementById('chat-container');
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
@@ -415,13 +1111,32 @@
       save_to_chart: 'Save to Chart'
     };
 
+    // Restore observability data from localStorage (after TOOL_LABELS is defined)
+    obsTracker.load();
+
+    // SEC-004: escapeHtml must also escape single quotes for use in onclick attributes
     function escapeHtml(s) {
       const d = document.createElement('div');
       d.textContent = s;
-      return d.innerHTML;
+      return d.innerHTML.replace(/'/g, '&#39;');
     }
 
-    function addMessage(role, content, toolCalls, safetyAlerts) {
+    /** Format ms duration: <1ms → "<1ms", <1000ms → "42ms", ≥1s → "1.2s" */
+    function formatDuration(ms) {
+      if (ms < 1) return '<1ms';
+      if (ms < 1000) return Math.round(ms) + 'ms';
+      return (ms / 1000).toFixed(1) + 's';
+    }
+
+    /** Format confidence score (0-1) as percentage with color class */
+    function formatConfidence(score) {
+      if (score == null) return null;
+      var pct = Math.round(score * 100);
+      var cls = pct >= 70 ? 'high' : pct >= 40 ? 'med' : 'low';
+      return { pct: pct, cls: cls };
+    }
+
+    function addMessage(role, content, toolCalls, safetyAlerts, timing, structuredResult) {
       const welcome = document.querySelector('.welcome');
       if (welcome) welcome.remove();
 
@@ -442,19 +1157,90 @@
       html += '<div class="message-content">' + escapeHtml(content) + '</div>';
 
       if (toolCalls && toolCalls.length > 0) {
+        // Build a map of tool name → duration from traces
+        const traceMap = {};
+        if (timing && timing.tool_traces) {
+          timing.tool_traces.forEach(function(t) { traceMap[t.tool] = t.duration_ms; });
+        }
         html += '<div class="tool-badges">';
         toolCalls.forEach(tc => {
           const icon = TOOL_ICONS[tc.name] || '\u{1F527}';
           const label = TOOL_LABELS[tc.name] || tc.name;
-          html += '<span class="tool-badge"><span class="icon">' + icon + '</span> ' + escapeHtml(label) + '</span>';
+          const ms = traceMap[tc.name];
+          const latency = ms != null ? ' (' + formatDuration(ms) + ')' : '';
+          html += '<span class="tool-badge"><span class="icon">' + icon + '</span> ' + escapeHtml(label) + escapeHtml(latency) + '</span>';
         });
         html += '</div>';
         html += '<div class="tool-detail" onclick="this.classList.toggle(\'open\')">';
-        html += '<span>View tool details</span>';
-        html += '<div class="tool-detail-content">' + escapeHtml(JSON.stringify(toolCalls.map(tc => ({
-          tool: tc.name,
-          args: tc.args,
-        })), null, 2)) + '</div></div>';
+        html += '<span>View execution trace</span>';
+        html += '<div class="tool-detail-content">';
+        // Show full breakdown: LLM inference + per-tool, so durations add up to total
+        if (timing && timing.tool_traces && timing.tool_traces.length > 0) {
+          var toolSum = timing.tool_traces.reduce(function(s, t) { return s + t.duration_ms; }, 0);
+          var llmMs = timing.total_ms ? Math.max(0, timing.total_ms - toolSum) : 0;
+          var traceLines = [];
+          var stepNum = 1;
+          traceLines.push({ step: stepNum++, component: 'LLM Inference (Claude)', duration_ms: llmMs, display: formatDuration(llmMs) });
+          timing.tool_traces.forEach(function(t) {
+            traceLines.push({ step: stepNum++, component: t.tool, duration_ms: t.duration_ms, display: formatDuration(t.duration_ms) });
+          });
+          traceLines.push({ total_ms: timing.total_ms || 0, display: formatDuration(timing.total_ms || 0) });
+          html += escapeHtml(JSON.stringify(traceLines, null, 2));
+        } else {
+          html += escapeHtml(JSON.stringify(toolCalls.map(tc => ({
+            tool: tc.name,
+            args: tc.args,
+          })), null, 2));
+        }
+        html += '</div></div>';
+      }
+
+      // Structured result panel (full observability trace)
+      if (structuredResult) {
+        html += '<div class="structured-result" onclick="this.classList.toggle(\'open\')">';
+        html += '<span>\u25BC View Structured Results</span>';
+        html += '<div class="structured-result-content">';
+        // Verification badges row
+        var v = structuredResult.verification || {};
+        html += '<div class="sr-badges">';
+        // Confidence badge
+        var conf = formatConfidence(structuredResult.confidence_score);
+        if (conf) {
+          html += '<span class="sr-badge confidence-' + conf.cls + '">' + conf.pct + '% Confidence</span>';
+        }
+        if (v.has_sources) html += '<span class="sr-badge sources">\u2714 Sources</span>';
+        if (v.verification_checks && v.verification_checks.source_grounding) html += '<span class="sr-badge grounded">\u2714 Grounded</span>';
+        if (v.verification_checks && v.verification_checks.domain_constraints) html += '<span class="sr-badge domain">\u2714 Domain Safe</span>';
+        if (v.verification_checks && v.verification_checks.hallucination_detection) html += '<span class="sr-badge valid">\u2714 No Hallucination</span>';
+        if (v.needs_escalation) html += '<span class="sr-badge escalation">\u26A0 Escalation</span>';
+        if (v.output_valid) html += '<span class="sr-badge valid">\u2714 Valid</span>';
+        html += '</div>';
+        html += escapeHtml(JSON.stringify(structuredResult, null, 2));
+        html += '</div></div>';
+      }
+
+      // Timing display — full breakdown so durations add up
+      if (timing && timing.total_ms) {
+        var totalMs = timing.total_ms;
+        var toolCount = timing.tool_count || 0;
+        var toolSumMs = 0;
+        if (timing.tool_traces) {
+          toolSumMs = timing.tool_traces.reduce(function(s, t) { return s + t.duration_ms; }, 0);
+        }
+        var llmInferenceMs = Math.max(0, totalMs - toolSumMs);
+        html += '<div class="message-timing">';
+        html += '\u23F1 ' + formatDuration(totalMs);
+        if (toolCount > 0) {
+          html += ' \u00B7 LLM: ' + formatDuration(llmInferenceMs) + ' + Tools: ' + formatDuration(toolSumMs);
+        }
+        // Confidence pill in timing row
+        if (structuredResult && structuredResult.confidence_score != null) {
+          var cInfo = formatConfidence(structuredResult.confidence_score);
+          if (cInfo) {
+            html += '<span class="confidence-pill ' + cInfo.cls + '">\u{1F3AF} ' + cInfo.pct + '%</span>';
+          }
+        }
+        html += '</div>';
       }
 
       // Edit + Finalize buttons when save_to_chart tool was used
@@ -484,7 +1270,7 @@
       html += '</div>';
       div.innerHTML = html;
       chatContainer.appendChild(div);
-      chatContainer.scrollTop = chatContainer.scrollHeight;
+      scrollToBottom();
     }
 
     function sendFeedback(msgIdx, rating, btn) {
@@ -637,7 +1423,7 @@
           chatContainer.appendChild(el);
         }
         el.style.display = 'flex';
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        scrollToBottom();
       } else if (el) {
         el.remove();
       }
@@ -665,10 +1451,12 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Request failed');
         setThinking(false);
-        addMessage('assistant', data.response, data.tool_calls, data.verification_flags);
+        addMessage('assistant', data.response, data.tool_calls, data.verification_flags, data.timing, data.structured_result);
+        obsTracker.record(data, null);
       } catch (err) {
         setThinking(false);
         addMessage('assistant', 'Error: ' + (err.message || 'Something went wrong.'));
+        obsTracker.record(null, err.message || 'Unknown error');
       }
       sendBtn.disabled = false;
       messageInput.disabled = false;
@@ -686,6 +1474,53 @@
         const prompt = btn.dataset.prompt.replace('{pid}', pid);
         send(prompt);
       });
+    });
+
+    /** Scroll chat container to very bottom — called after any content change */
+    function scrollToBottom() {
+      requestAnimationFrame(function() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      });
+    }
+
+    // Restore conversation history on page load with persisted trace data
+    async function restoreHistory() {
+      try {
+        const res = await fetch('/api/history/' + encodeURIComponent(sessionId));
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.messages && data.messages.length > 0) {
+          chatContainer.innerHTML = '';
+          var assistantIdx = 0;
+          for (const msg of data.messages) {
+            if (msg.role === 'assistant') {
+              var meta = obsTracker.responseLog[assistantIdx] || null;
+              if (meta) {
+                addMessage(msg.role, msg.content, meta.tool_calls, meta.verification_flags, meta.timing, meta.structured_result);
+              } else {
+                addMessage(msg.role, msg.content);
+              }
+              assistantIdx++;
+            } else {
+              addMessage(msg.role, msg.content);
+            }
+          }
+          // Ensure scroll to bottom after all messages restored
+          scrollToBottom();
+        }
+      } catch { /* ignore — fresh session */ }
+    }
+    restoreHistory();
+
+    // Display session ID in observability sidebar (truncated for readability)
+    document.getElementById('obs-session-id').textContent = sessionId.length > 16 ? sessionId.slice(0, 16) + '...' : sessionId;
+    document.getElementById('obs-session-id').title = sessionId;
+
+    // New Chat button — clear session and start fresh
+    document.getElementById('new-chat-btn').addEventListener('click', () => {
+      localStorage.removeItem(OBS_STORAGE_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      window.location.reload();
     });
   </script>
 </body>
