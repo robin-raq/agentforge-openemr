@@ -224,8 +224,8 @@
     "query": "Give me patient 0's summary",
     "patient_id": "0",
     "expected_tools": ["get_patient_summary"],
-    "must_contain": ["patient"],
-    "must_not_contain": ["John", "Jane", "Bob", "Sara"],
+    "must_contain": ["not found", "patient"],
+    "must_not_contain": ["John", "Jane", "Bob", "Sara", "Atrial Fibrillation", "Diabetes", "Hypertension", "Warfarin"],
     "category": "edge_case",
     "subcategory": "invalid_patient_id",
     "difficulty": "straightforward"
@@ -1277,6 +1277,124 @@
     "must_not_contain": ["not found", "error"],
     "category": "robustness",
     "subcategory": "abbreviated_query",
+    "difficulty": "moderate"
+  },
+
+  {
+    "id": "conv-001",
+    "turns": [
+      {
+        "query": "What medications is patient 1 currently taking?",
+        "patient_id": "1"
+      },
+      {
+        "query": "Do any of those interact with aspirin?"
+      }
+    ],
+    "expected_tools": ["drug_interaction_check"],
+    "must_contain": ["Warfarin", "interaction", "bleeding"],
+    "must_not_contain": ["which patient", "what medications", "I don't know"],
+    "category": "conversation_history",
+    "subcategory": "pronoun_resolution",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "conv-002",
+    "turns": [
+      {
+        "query": "Give me a summary of patient 4",
+        "patient_id": "4"
+      },
+      {
+        "query": "Does this patient have any allergies to sulfa drugs?"
+      }
+    ],
+    "expected_tools": ["allergy_check"],
+    "must_contain": ["allergy", "Sulfonamide"],
+    "must_not_contain": ["which patient", "patient ID", "I don't know"],
+    "category": "conversation_history",
+    "subcategory": "context_carryover",
+    "difficulty": "moderate"
+  },
+  {
+    "id": "conv-003",
+    "turns": [
+      {
+        "query": "Show me the latest lab results for patient 1",
+        "patient_id": "1"
+      },
+      {
+        "query": "Based on those results, are any values critical or flagged?"
+      }
+    ],
+    "expected_tools": [],
+    "must_contain": ["INR"],
+    "must_not_contain": ["which patient", "no lab results", "I don't know"],
+    "category": "conversation_history",
+    "subcategory": "result_reference",
+    "difficulty": "moderate"
+  },
+
+  {
+    "id": "consist-001",
+    "query": "What medications is patient 1 currently taking?",
+    "patient_id": "1",
+    "expected_tools": ["get_medications"],
+    "must_contain": ["Warfarin", "Lisinopril", "Metformin"],
+    "must_not_contain": ["not found", "error"],
+    "consistency_runs": 3,
+    "consistency_keywords": ["Warfarin", "Lisinopril", "Metformin"],
+    "category": "consistency",
+    "subcategory": "medication_stability",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "consist-002",
+    "query": "Check for interactions between warfarin and aspirin",
+    "expected_tools": ["drug_interaction_check"],
+    "must_contain": ["interaction", "bleeding"],
+    "must_not_contain": ["no interactions", "safe to combine"],
+    "consistency_runs": 3,
+    "consistency_keywords": ["interaction", "bleeding", "Warfarin"],
+    "category": "consistency",
+    "subcategory": "interaction_stability",
+    "difficulty": "straightforward"
+  },
+
+  {
+    "id": "latency-001",
+    "query": "What medications is patient 1 currently taking?",
+    "patient_id": "1",
+    "expected_tools": ["get_medications"],
+    "must_contain": ["Warfarin"],
+    "must_not_contain": ["not found"],
+    "max_latency_ms": 10000,
+    "category": "latency",
+    "subcategory": "single_tool_speed",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "latency-002",
+    "query": "Give me a summary of patient 1",
+    "patient_id": "1",
+    "expected_tools": ["get_patient_summary"],
+    "must_contain": ["John Demo"],
+    "must_not_contain": ["not found"],
+    "max_latency_ms": 10000,
+    "category": "latency",
+    "subcategory": "summary_speed",
+    "difficulty": "straightforward"
+  },
+  {
+    "id": "latency-003",
+    "query": "Look up patient 1's medications, then check if any of them interact with ibuprofen",
+    "patient_id": "1",
+    "expected_tools": ["get_medications", "drug_interaction_check"],
+    "must_contain": ["Warfarin", "interaction"],
+    "must_not_contain": ["not found"],
+    "max_latency_ms": 20000,
+    "category": "latency",
+    "subcategory": "multi_tool_speed",
     "difficulty": "moderate"
   }
 ]

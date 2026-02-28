@@ -7,9 +7,14 @@ import type { RubricResult } from "./rubric-judge";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
+interface ConversationTurn {
+  query: string;
+  patient_id?: string;
+}
+
 interface TestCase {
   id: string;
-  query: string;
+  query?: string;                // Single-turn query (omit if using turns)
   patient_id?: string;
   expected_tools: string[];
   must_contain: string[];
@@ -17,6 +22,13 @@ interface TestCase {
   category?: string;
   subcategory?: string;
   difficulty?: string;
+  // Multi-turn conversation tests
+  turns?: ConversationTurn[];    // If present, runs sequentially; asserts on final turn only
+  // Consistency tests
+  consistency_runs?: number;     // Number of times to run the same query
+  consistency_keywords?: string[]; // Keywords that must appear in ALL runs
+  // Latency assertions
+  max_latency_ms?: number;       // If present, assert response completes within this time
 }
 
 interface EvalResult {
@@ -269,9 +281,61 @@ async function runEval() {
     const start = Date.now();
 
     try {
-      const result = await chat(tc.query, `eval-${tc.id}`, []);
-      const toolsUsed = result.toolCalls.map((t) => t.name);
-      const duration_ms = Date.now() - start;
+      // ── Execute query (supports single-turn, multi-turn, and consistency) ──
+      let result: Awaited<ReturnType<typeof chat>>;
+      let toolsUsed: string[];
+      let duration_ms: number;
+      const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+      if (tc.turns && tc.turns.length > 0) {
+        // ── Multi-turn conversation test ──
+        // Run all turns sequentially, building up history.
+        // Assertions are evaluated only on the FINAL turn.
+        for (let i = 0; i < tc.turns.length; i++) {
+          const turn = tc.turns[i];
+          const sessionId = `eval-${tc.id}-turn${i}`;
+          result = await chat(turn.query, sessionId, history);
+          if (i < tc.turns.length - 1 && verbose) {
+            console.log(`   Turn ${i + 1}/${tc.turns.length}: "${turn.query.slice(0, 60)}..." → ${result.toolCalls.length} tools`);
+          }
+        }
+        // result is now the final turn's result
+        result = result!;
+        toolsUsed = result.toolCalls.map((t) => t.name);
+        duration_ms = Date.now() - start;
+      } else if (tc.consistency_runs && tc.consistency_runs > 1) {
+        // ── Consistency test ──
+        // Run the same query N times; assert keywords appear in ALL runs.
+        const runResults: string[] = [];
+        for (let i = 0; i < tc.consistency_runs; i++) {
+          const runResult = await chat(tc.query!, `eval-${tc.id}-run${i}`, []);
+          runResults.push(runResult.response);
+          if (i === 0) {
+            result = runResult; // Use first run for standard assertions
+          }
+        }
+        result = result!;
+        toolsUsed = result.toolCalls.map((t) => t.name);
+        duration_ms = Date.now() - start;
+
+        // Check consistency: all keywords must appear in ALL runs
+        if (tc.consistency_keywords) {
+          for (const keyword of tc.consistency_keywords) {
+            const missingInRun = runResults.findIndex(
+              (r) => !r.toLowerCase().includes(keyword.toLowerCase())
+            );
+            if (missingInRun >= 0) {
+              failures.push(`consistency: "${keyword}" missing in run ${missingInRun + 1}/${tc.consistency_runs}`);
+            }
+          }
+        }
+      } else {
+        // ── Standard single-turn test ──
+        result = await chat(tc.query!, `eval-${tc.id}`, []);
+        toolsUsed = result.toolCalls.map((t) => t.name);
+        duration_ms = Date.now() - start;
+      }
+
       const category = tc.category || "golden_set";
 
       // ── Programmatic Assertions (cookbook eval_checks.py) ──
@@ -303,6 +367,11 @@ async function runEval() {
         for (const f of negativeCheck.found) {
           failures.push(`must_not_contain found: "${f}"`);
         }
+      }
+
+      // 5. Check latency assertion
+      if (tc.max_latency_ms && duration_ms > tc.max_latency_ms) {
+        failures.push(`latency ${duration_ms}ms exceeds max ${tc.max_latency_ms}ms`);
       }
 
       // ── Verification Metrics ──
