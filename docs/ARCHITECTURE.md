@@ -23,7 +23,7 @@
 
 **LLM:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) at temperature 0 for deterministic clinical responses. Hard 60-second timeout via `Promise.race`.
 
-**Reasoning approach:** The agent uses Claude's native tool-calling API (not ReAct prompting). The system prompt encodes clinical rules: never prescribe, always cite sources, flag critical findings, differentiate clinician-facing vs. patient-facing language. The agent decides which tools to call based on the query, executes them (up to 10 iterations for multi-step workflows), and synthesizes results into a natural-language response.
+**Reasoning approach:** The agent implements the ReAct pattern (Think → Act → Observe → Repeat) via Claude's native tool-calling API and LangChain's `AgentExecutor`. Rather than parsing explicit "Thought:/Action:/Observation:" text, the same reasoning loop is handled through structured tool-call messages — more reliable for clinical contexts where deterministic tool selection matters. The system prompt encodes clinical rules: never prescribe, always cite sources, flag critical findings, differentiate clinician-facing vs. patient-facing language. The agent decides which tools to call based on the query, executes them (up to 10 iterations for multi-step workflows), and synthesizes results into a natural-language response.
 
 **Tool design:** All 10 tools use `tool()` from `@langchain/core/tools` with Zod input schemas and return `JSON.stringify(result)`. Tools accept a `DataSource` dependency for testability (mock vs. FHIR). The 5 MVP tools handle core queries; the 5 bounty tools handle discharge workflows:
 
