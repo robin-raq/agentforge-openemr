@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { DataSource } from "../data/datasource";
 import { getDrugEducation } from "../data/dailymed-client";
 import { getErrorMessage } from "../utils/errors";
+import { DRUG_EDUCATION_TIMEOUT_MS, DRUG_EDUCATION_TOTAL_TIMEOUT_MS } from "../constants";
 
 /**
  * Condition-based warning signs for patients (layman-friendly).
@@ -143,8 +144,6 @@ export function generateDischargeInstructions(dataSource: DataSource) {
           s && s.length > max ? s.slice(0, max) + "..." : s;
 
         // Fetch in parallel with per-drug timeout circuit breaker
-        const DRUG_EDUCATION_TIMEOUT_MS = 5_000;
-        const DRUG_EDUCATION_TOTAL_TIMEOUT_MS = 15_000;
 
         const educationPromises = medNamesForEducation.map(async (name) => {
           try {

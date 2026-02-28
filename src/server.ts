@@ -6,6 +6,19 @@ import { randomUUID } from "node:crypto";
 import { chat } from "./agent";
 import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls, getDataSource } from "./config";
 import type { DataSource } from "./data/datasource";
+import {
+  MAX_SESSIONS,
+  MAX_HISTORY_LENGTH,
+  MAX_MESSAGE_LENGTH,
+  RATE_LIMIT_PER_MINUTE,
+  RATE_LIMIT_WINDOW_MS,
+  PATIENT_TOOLS,
+  FDA_TOOLS,
+  DAILYMED_TOOLS,
+  COMPREHENSIVE_TOOLS,
+  SINGLE_TOOL_TARGET_MS,
+  MULTI_STEP_TARGET_MS,
+} from "./constants";
 
 /**
  * Compute a confidence score (0.0–1.0) for a response based on multiple signals.
@@ -90,11 +103,7 @@ function getAllowedOrigins(): string[] {
 
 type HistoryEntry = { role: "user" | "assistant"; content: string };
 
-const MAX_SESSIONS = 1000;
-const MAX_HISTORY_LENGTH = 20;
-const MAX_MESSAGE_LENGTH = 2000;
-const RATE_LIMIT_PER_MINUTE = 10;
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+// Constants imported from ./constants
 
 // Input validation patterns (exported for testing)
 export const SESSION_ID_REGEX = /^[\w-]{1,128}$/;
@@ -318,11 +327,10 @@ export function createApp(): express.Express {
 
       // Build structured result for observability (inspired by clinical agent best practices)
       const toolNames = result.toolCalls.map((tc) => tc.name);
-      const PATIENT_SOURCES = new Set(["get_patient_summary","get_medications","allergy_check","get_lab_results","get_encounter_data","reconcile_medications","draft_discharge_summary","generate_discharge_instructions","save_to_chart"]);
       const sources: string[] = [];
-      if (toolNames.some((n) => PATIENT_SOURCES.has(n))) sources.push("OpenEMR Patient Records");
-      if (toolNames.includes("drug_interaction_check")) sources.push("OpenFDA Drug Interaction Database");
-      if (toolNames.includes("generate_discharge_instructions")) sources.push("DailyMed (NLM/NIH)");
+      if (toolNames.some((n) => PATIENT_TOOLS.has(n))) sources.push("OpenEMR Patient Records");
+      if (toolNames.some((n) => FDA_TOOLS.has(n))) sources.push("OpenFDA Drug Interaction Database");
+      if (toolNames.some((n) => DAILYMED_TOOLS.has(n))) sources.push("DailyMed (NLM/NIH)");
 
       const hasEscalation = result.safetyAlerts.some((a) => /CRITICAL|SAFETY ALERT/i.test(a));
       const hasSources = /Sources:/i.test(result.response);
@@ -338,13 +346,10 @@ export function createApp(): express.Express {
       const isMultiStep = toolCount >= 3;
 
       // Performance target assessment for this request
-      const SINGLE_TOOL_TARGET_MS = 5_000;
-      const MULTI_STEP_TARGET_MS = 15_000;
       const latencyTarget = isSingleTool ? SINGLE_TOOL_TARGET_MS : isMultiStep ? MULTI_STEP_TARGET_MS : null;
       const meetsLatencyTarget = latencyTarget !== null ? result.durationMs < latencyTarget : null;
 
       // Comprehensive reports = discharge summary, discharge instructions, or med reconciliation
-      const COMPREHENSIVE_TOOLS = new Set(["draft_discharge_summary", "generate_discharge_instructions", "reconcile_medications"]);
       const isComprehensiveReport = toolNames.some((n) => COMPREHENSIVE_TOOLS.has(n));
 
       // Confidence scoring

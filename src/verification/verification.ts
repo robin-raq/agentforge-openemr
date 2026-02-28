@@ -18,19 +18,7 @@ export function detectPrescriptiveLanguage(response: string): boolean {
   return PRESCRIPTIVE_PATTERNS.some((p) => p.test(response));
 }
 
-const PATIENT_TOOLS = new Set([
-  "get_patient_summary",
-  "get_medications",
-  "allergy_check",
-  "get_lab_results",
-  "get_encounter_data",
-  "reconcile_medications",
-  "draft_discharge_summary",
-  "generate_discharge_instructions",
-  "save_to_chart",
-]);
-const FDA_TOOLS = new Set(["drug_interaction_check"]);
-const DAILYMED_TOOLS = new Set(["generate_discharge_instructions"]);
+import { PATIENT_TOOLS, FDA_TOOLS, DAILYMED_TOOLS } from "../constants";
 
 function buildSourceCitation(
   toolCalls: Array<{ name: string; args: unknown; result?: string }>

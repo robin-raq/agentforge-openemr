@@ -1,8 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-
-const MAX_MEDICATIONS_FOR_FDA = 10;
-const FDA_API_TIMEOUT_MS = 3000;
+import { MAX_MEDICATIONS_FOR_FDA, FDA_API_TIMEOUT_MS } from "../constants";
 
 const KNOWN_INTERACTIONS = [
   {
