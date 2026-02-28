@@ -66,7 +66,9 @@ export function draftDischargeSummary(dataSource: DataSource) {
           labs_at_discharge: {
             critical: criticalLabs,
             abnormal: abnormalLabs,
-            all: labs,
+            // Only include normal labs separately to avoid duplicating critical/abnormal
+            normal: labs.filter((l) => !l.flag || l.flag === "normal"),
+            total_count: labs.length,
           },
           conditions: patient.conditions,
           vitals: patient.vitals,
