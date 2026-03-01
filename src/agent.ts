@@ -31,18 +31,40 @@ export interface ToolTrace {
 }
 
 /**
- * LangChain callback handler that captures per-tool execution timing.
- * Hooks into handleToolStart/handleToolEnd to record real latency per tool call.
+ * LangChain callback handler that captures per-tool execution timing
+ * and LLM reasoning steps (text content from model responses).
  *
  * LangChain callback signature:
  *   handleToolStart(tool: Serialized, input, runId, parentRunId?, tags?, metadata?, runName?)
  *   handleToolEnd(output, runId, parentRunId?, tags?)
+ *   handleLLMEnd(output, runId, parentRunId?, tags?)
  */
 export class ToolTimingCallbackHandler extends BaseCallbackHandler {
   name = "tool_timing";
   private pending: Map<string, number> = new Map();
   private toolNames: Map<string, string> = new Map();
   traces: ToolTrace[] = [];
+  reasoningSteps: string[] = [];
+
+  async handleLLMEnd(
+    output: { generations?: Array<Array<{ text?: string; message?: { content?: unknown } }>> },
+  ): Promise<void> {
+    // Extract text reasoning from the LLM response content blocks.
+    // Claude's tool-calling responses include text blocks (reasoning) alongside tool_use blocks.
+    const gen = output?.generations?.[0]?.[0];
+    const content = gen?.message?.content;
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block && typeof block === "object" && (block as { type?: string }).type === "text") {
+          const text = ((block as { text?: string }).text || "").trim();
+          if (text) this.reasoningSteps.push(text);
+        }
+      }
+    } else if (gen?.text) {
+      const text = gen.text.trim();
+      if (text) this.reasoningSteps.push(text);
+    }
+  }
 
   async handleToolStart(
     tool: { id?: string[]; name?: string },
@@ -199,6 +221,7 @@ export interface ChatResult {
   toolCalls: Array<{ name: string; args: unknown; result?: string }>;
   safetyAlerts: string[];
   toolTraces: ToolTrace[];
+  reasoningSteps: string[];
   durationMs: number;
 }
 
@@ -294,6 +317,7 @@ export async function chat(
       toolCalls: verification.toolCalls,
       safetyAlerts: verification.safetyAlerts,
       toolTraces: timingHandler.traces,
+      reasoningSteps: timingHandler.reasoningSteps,
       durationMs,
     };
   } catch (err) {
@@ -310,6 +334,7 @@ export async function chat(
       toolCalls: [],
       safetyAlerts: verification.safetyAlerts,
       toolTraces: timingHandler.traces,
+      reasoningSteps: timingHandler.reasoningSteps,
       durationMs: Date.now() - requestStartTime,
     };
   }
