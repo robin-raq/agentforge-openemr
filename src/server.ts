@@ -427,6 +427,39 @@ export function createApp(): express.Express {
     });
   });
 
+  // List all sessions (for chat history sidebar)
+  app.get("/api/sessions", (req, res) => {
+    const patient_id = req.query.patient_id as string | undefined;
+    const sessions: Array<{
+      session_id: string;
+      message_count: number;
+      last_access: number;
+      first_message?: string;
+    }> = [];
+
+    for (const [id, session] of sessionHistory) {
+      const entries = session.entries;
+      if (patient_id) {
+        const hasPatient = entries.some(
+          (e) =>
+            e.content.includes(`patient ${patient_id}`) ||
+            e.content.includes(`[Context: Currently viewing patient ${patient_id}]`)
+        );
+        if (!hasPatient) continue;
+      }
+      const firstUserMsg = entries.find((e) => e.role === "user");
+      sessions.push({
+        session_id: id,
+        message_count: entries.length,
+        last_access: session.lastAccess,
+        first_message: firstUserMsg?.content?.slice(0, 80),
+      });
+    }
+
+    sessions.sort((a, b) => b.last_access - a.last_access);
+    res.json({ sessions: sessions.slice(0, 50) });
+  });
+
   // Session history retrieval — enables UI to restore conversation on page reload
   app.get("/api/history/:session_id", (req, res) => {
     const { session_id } = req.params;

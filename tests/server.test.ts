@@ -641,6 +641,79 @@ describe("server", () => {
       expect(payloadTwo.performance.query_type).toBe("zero_or_two_tool");
     });
   });
+
+  describe("UI clinician branding", () => {
+    it("GET / serves HTML with clinician-banner element", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.status).toBe(200);
+      expect(res.body).toContain("clinician-banner");
+      expect(res.body).toContain("Authorized Healthcare Providers");
+    });
+
+    it("GET / serves HTML with app-layout flex container", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.body).toContain("app-layout");
+      expect(res.body).toContain("main-content");
+    });
+
+    it("GET / serves HTML with observability sidebar open by default", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.body).toContain('class="obs-sidebar open"');
+    });
+
+    it("GET / serves HTML with clinical disclaimer in footer", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.body).toContain("Not a substitute for clinical judgment");
+    });
+  });
+
+  describe("sessions listing endpoint", () => {
+    it("GET /api/sessions returns 200 with sessions array", async () => {
+      const res = await makeRequest(app, "GET", "/api/sessions");
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.sessions).toBeDefined();
+      expect(Array.isArray(body.sessions)).toBe(true);
+    });
+
+    it("GET /api/sessions includes session with messages", async () => {
+      const sid = "sessions-list-test-" + Date.now();
+      setSessionHistory(sid, [
+        { role: "user", content: "What meds is patient 1 on?" },
+        { role: "assistant", content: "Patient 1 is on warfarin, metformin..." },
+      ]);
+      const res = await makeRequest(app, "GET", "/api/sessions");
+      const body = JSON.parse(res.body);
+      const found = body.sessions.find((s: any) => s.session_id === sid);
+      expect(found).toBeDefined();
+      expect(found.message_count).toBe(2);
+      expect(found.first_message).toContain("What meds");
+    });
+
+    it("GET /api/sessions returns empty array when no sessions exist matching filter", async () => {
+      const res = await makeRequest(app, "GET", "/api/sessions?patient_id=nonexistent999");
+      const body = JSON.parse(res.body);
+      expect(body.sessions).toEqual([]);
+    });
+
+    it("GET /api/sessions filters by patient_id", async () => {
+      const sid = "patient-filter-test-" + Date.now();
+      setSessionHistory(sid, [
+        { role: "user", content: "[Context: Currently viewing patient 3]\n\nCheck allergies" },
+        { role: "assistant", content: "Patient 3 has allergies to..." },
+      ]);
+      const res = await makeRequest(app, "GET", "/api/sessions?patient_id=3");
+      const body = JSON.parse(res.body);
+      const found = body.sessions.find((s: any) => s.session_id === sid);
+      expect(found).toBeDefined();
+
+      // Should NOT appear when filtering for patient 1
+      const res2 = await makeRequest(app, "GET", "/api/sessions?patient_id=1");
+      const body2 = JSON.parse(res2.body);
+      const notFound = body2.sessions.find((s: any) => s.session_id === sid);
+      expect(notFound).toBeUndefined();
+    });
+  });
 });
 
 // Minimal test helper — makes HTTP requests to an Express app without starting a real server
