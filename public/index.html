@@ -2147,7 +2147,7 @@
       return { pct: pct, cls: cls };
     }
 
-    function addMessage(role, content, toolCalls, safetyAlerts, timing, structuredResult) {
+    function addMessage(role, content, toolCalls, safetyAlerts, timing, structuredResult, reasoningSteps) {
       const welcome = document.querySelector('.welcome');
       if (welcome) welcome.remove();
 
@@ -2190,6 +2190,16 @@
         html += '<div class="tool-detail" onclick="this.classList.toggle(\'open\')">';
         html += '<span>View execution trace</span>';
         html += '<div class="tool-detail-content">';
+        // Show LLM reasoning steps (input → reasoning → tool calls → output)
+        if (reasoningSteps && reasoningSteps.length > 0) {
+          html += '<div style="margin-bottom:8px;"><strong>Agent Reasoning:</strong></div>';
+          reasoningSteps.forEach(function(step, i) {
+            html += '<div style="margin-bottom:6px;padding:6px 8px;background:rgba(37,99,235,0.06);border-left:3px solid #2563eb;border-radius:0 4px 4px 0;font-size:0.8rem;color:#334155;">';
+            html += '<span style="font-weight:600;color:#2563eb;">Step ' + (i + 1) + ':</span> ' + escapeHtml(step);
+            html += '</div>';
+          });
+          html += '<hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0;">';
+        }
         // Show full breakdown: LLM inference + per-tool, so durations add up to total
         if (timing && timing.tool_traces && timing.tool_traces.length > 0) {
           var toolSum = timing.tool_traces.reduce(function(s, t) { return s + t.duration_ms; }, 0);
@@ -2537,7 +2547,7 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Request failed');
         setThinking(false);
-        addMessage('assistant', data.response, data.tool_calls, data.verification_flags, data.timing, data.structured_result);
+        addMessage('assistant', data.response, data.tool_calls, data.verification_flags, data.timing, data.structured_result, data.reasoning_steps);
         obsTracker.record(data, null);
       } catch (err) {
         setThinking(false);

@@ -99,6 +99,7 @@ export interface ChatResponsePayload {
   response: string;
   tool_calls: ChatResult["toolCalls"];
   verification_flags: string[];
+  reasoning_steps: string[];
   timing: {
     total_ms: number;
     llm_ms: number;
@@ -168,6 +169,7 @@ export function buildChatResponse(result: ChatResult): ChatResponsePayload {
     response: result.response,
     tool_calls: result.toolCalls,
     verification_flags: result.safetyAlerts,
+    reasoning_steps: result.reasoningSteps,
     timing: {
       total_ms: result.durationMs,
       llm_ms: llmInferenceMs,
