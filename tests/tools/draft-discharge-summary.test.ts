@@ -66,7 +66,7 @@ describe("draft_discharge_summary", () => {
     expect(result.labs_at_discharge.total_count).toBeGreaterThan(0);
     expect(result.labs_at_discharge).toHaveProperty("critical");
     expect(result.labs_at_discharge).toHaveProperty("abnormal");
-    expect(result.labs_at_discharge).toHaveProperty("normal");
+    expect(result.labs_at_discharge).toHaveProperty("normal_count");
   });
 
   it("sets safety_flags.has_critical_labs correctly for patient 1", async () => {

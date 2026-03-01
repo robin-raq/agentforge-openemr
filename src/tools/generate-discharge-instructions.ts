@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { DataSource } from "../data/datasource";
-import { getDrugEducation } from "../data/dailymed-client";
+import { getDrugEducation, DISCHARGE_EDUCATION_SECTIONS } from "../data/dailymed-client";
 import { getErrorMessage } from "../utils/errors";
 import { DRUG_EDUCATION_TIMEOUT_MS, DRUG_EDUCATION_TOTAL_TIMEOUT_MS } from "../constants";
 
@@ -148,7 +148,7 @@ export function generateDischargeInstructions(dataSource: DataSource) {
         const educationPromises = medNamesForEducation.map(async (name) => {
           try {
             const result = await Promise.race([
-              getDrugEducation(name),
+              getDrugEducation(name, DISCHARGE_EDUCATION_SECTIONS),
               new Promise<null>((resolve) =>
                 setTimeout(() => resolve(null), DRUG_EDUCATION_TIMEOUT_MS)
               ),

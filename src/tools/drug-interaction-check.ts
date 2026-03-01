@@ -99,32 +99,36 @@ export function drugInteractionCheck() {
           }> = [...fallbackInteractions];
 
           if (interactions.length === 0) {
-            for (const [drug1, drug2] of pairs) {
-              const n1 = normalizeDrug(drug1);
-              const n2 = normalizeDrug(drug2);
-              const url = `https://api.fda.gov/drug/label.json?search=drug_interactions:"${encodeURIComponent(n1)}"+AND+drug_interactions:"${encodeURIComponent(n2)}"&limit=1`;
-              try {
-                const res = await fetch(url, { signal: controller.signal });
-                if (res.ok) {
-                  const json = await res.json();
-                  if (json.results && json.results.length > 0) {
-                    const label = json.results[0];
-                    const drugInteractions = label.drug_interactions || [];
-                    for (const di of drugInteractions) {
-                      interactions.push({
+            // Parallelize FDA API calls for all drug pairs
+            const fdaResults = await Promise.all(
+              pairs.map(async ([drug1, drug2]) => {
+                const n1 = normalizeDrug(drug1);
+                const n2 = normalizeDrug(drug2);
+                const url = `https://api.fda.gov/drug/label.json?search=drug_interactions:"${encodeURIComponent(n1)}"+AND+drug_interactions:"${encodeURIComponent(n2)}"&limit=1`;
+                try {
+                  const res = await fetch(url, { signal: controller.signal });
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json.results && json.results.length > 0) {
+                      const label = json.results[0];
+                      const drugInteractions = label.drug_interactions || [];
+                      return drugInteractions.map((di: unknown) => ({
                         drugs: [drug1, drug2],
                         drug_pair: `${drug1} + ${drug2}`,
                         severity: "moderate",
-                        description: typeof di === "string" ? di : di.description || String(di),
+                        description: typeof di === "string" ? di : (di as any).description || String(di),
                         source: "openfda",
-                      });
+                      }));
                     }
                   }
+                } catch (err) {
+                  console.warn(`OpenFDA lookup failed for pair [${drug1}, ${drug2}]:`, err);
                 }
-              } catch (err) {
-                // QUAL-002: Log FDA API failures instead of silently swallowing
-                console.warn(`OpenFDA lookup failed for pair [${drug1}, ${drug2}]:`, err);
-              }
+                return [];
+              })
+            );
+            for (const results of fdaResults) {
+              interactions.push(...results);
             }
           }
 
