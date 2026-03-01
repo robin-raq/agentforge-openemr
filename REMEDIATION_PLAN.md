@@ -205,7 +205,7 @@ REFUSAL EXAMPLES (always refuse):
 |------|--------|
 | 5.1 | **Update ARCHITECTURE.md** — Clarify session persistence: "Requires Redis for production. In-memory + disk used when Redis not configured (sessions lost on restart)." |
 | 5.2 | **Update README** — Add "Session persistence" section: Redis setup, `REDIS_URL`, and note that without Redis, history is not retained across restarts. |
-| 5.3 | **Demo video script** — 1) Show conversation, 2) Reload page, 3) Show history restored. 4) Show observability sidebar with tool traces. 5) Show adversarial refusal. 6) Show eval results with category breakdown. |
+| 5.3 | **Demo video script** — See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). Covers: patient selection, tool traces, observability, patient scope/mismatch, different-patient-in-chat, adversarial refusal, discharge workflow, history, eval results. |
 | 5.4 | **Eval results in submission** — Include `results.json` or summary table with category breakdown. Highlight adversarial and edge-case improvements. |
 
 ---

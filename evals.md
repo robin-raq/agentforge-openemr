@@ -56,24 +56,25 @@ Labeled scenarios add tags for diagnostic reporting:
 | `subcategory` | Specific behavior: `meds_then_interactions`, `patient_not_found`, etc. |
 | `difficulty` | `straightforward` or `moderate` |
 
-## Current Dataset (79 cases)
+## Current Dataset (125 cases)
 
 ### Category Breakdown
 
 | Category | Count | What It Tests |
 |----------|-------|---------------|
 | Golden Sets (`gs-`) | 10 | Core tool routing + correct data returns |
-| Multi-tool (`sc-m-`) | 5 | Agent chains multiple tools correctly |
-| Edge Cases (`sc-e-`) | 9 | Empty data, invalid IDs, minimal patients |
-| Adversarial (`sc-a-`) | 7 | Scope violations, unauthorized actions |
-| Safety (`sc-s-`) | 7 | Emergency triage, critical labs, allergy overrides |
-| Query Variations (`sc-q-`) | 8 | Natural language phrasing differences |
-| Drug Interactions (`sc-d-`) | 5 | NSAID, supplement, OTC interactions |
-| Complex Queries (`sc-p-`) | 4 | Patient comparisons, preop assessments |
-| Bounty Tools (`bounty-`) | 12 | Encounters, med rec, discharge, save workflows |
-| Discharge Instructions (`di-`) | 7 | Plain language, DailyMed, appointments |
-| DailyMed (`dm-`) | 2 | Drug education source attribution |
-| Workflows (`wf-`) | 3 | End-to-end draft → save pipelines |
+| Multi-tool | 5 | Agent chains multiple tools correctly |
+| Edge Cases | 9 | Empty data, invalid IDs, minimal patients |
+| Adversarial | 22 | Scope violations, prompt injection, unauthorized actions |
+| Safety | 7 | Emergency triage, critical labs, allergy overrides |
+| Query Variations | 8 | Natural language phrasing differences |
+| Drug Interactions | 5 | NSAID, supplement, OTC interactions |
+| Complex Queries | 4 | Patient comparisons, preop assessments |
+| Bounty Tools | 15+ | Encounters, med rec, discharge, save workflows |
+| Discharge Instructions | 4 | Plain language, DailyMed, appointments |
+| DailyMed | 2 | Drug education source attribution |
+| Workflows | 3 | End-to-end draft → save pipelines |
+| Plus | 30+ | multi-turn, consistency, latency, robustness, etc. |
 
 ### Tool Coverage
 
@@ -94,11 +95,11 @@ Labeled scenarios add tags for diagnostic reporting:
 
 | Category | Required | Actual | Status |
 |----------|----------|--------|--------|
-| Happy path | 20+ | 27 | PASS |
-| Edge cases | 10+ | 12 | PASS |
-| Adversarial | 10+ | 14 | PASS |
-| Multi-step | 10+ | 26 | PASS |
-| **Total** | **50+** | **79** | **PASS** |
+| Happy path | 20+ | 50+ | PASS |
+| Edge cases | 10+ | 15+ | PASS |
+| Adversarial | 10+ | 22 | PASS |
+| Multi-step | 10+ | 26+ | PASS |
+| **Total** | **50+** | **125** | **PASS** |
 
 ## How the Runner Works
 

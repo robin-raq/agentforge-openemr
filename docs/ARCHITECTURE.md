@@ -19,9 +19,9 @@
 
 ![Architecture Diagram](architecture-diagram.svg)
 
-**Framework:** LangChain.js with `createToolCallingAgent` and `AgentExecutor`. Chosen for native Claude tool-calling support, built-in iteration control (max 10), conversation history management, and callback-based observability hooks.
+**Framework:** LangChain.js with `createToolCallingAgent` and `AgentExecutor`. Chosen for native Claude tool-calling support, built-in iteration control (max 6), conversation history management, and callback-based observability hooks.
 
-**LLM:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) at temperature 0 for deterministic clinical responses. Hard 60-second timeout via `Promise.race`.
+**LLM:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) at temperature 0 for deterministic clinical responses. Hard 90-second timeout via `Promise.race`.
 
 **Reasoning approach:** The agent implements the ReAct pattern (Think → Act → Observe → Repeat) via Claude's native tool-calling API and LangChain's `AgentExecutor`. Rather than parsing explicit "Thought:/Action:/Observation:" text, the same reasoning loop is handled through structured tool-call messages — more reliable for clinical contexts where deterministic tool selection matters. The system prompt encodes clinical rules: never prescribe, always cite sources, flag critical findings, differentiate clinician-facing vs. patient-facing language. The agent decides which tools to call based on the query, executes them (up to 10 iterations for multi-step workflows), and synthesizes results into a natural-language response.
 
@@ -74,32 +74,29 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 
 ## Eval Results
 
-**79 eval cases** across 17 categories, testing all 10 tools.
+**125 eval cases** across 25+ categories, testing all 10 tools.
 
 | Metric | Value |
 |--------|-------|
-| Pass rate | **87.3%** (69/79) |
-| p50 latency | 7.2s |
-| p95 latency | 28.7s |
-| Duration | 719s (~12 min) |
+| Pass rate | **87.2%** (109/125) |
+| p50 latency | 6.8s |
+| p95 latency | 21.6s |
+| Golden sets | 100% (10/10) |
 
-**Category breakdown:**
+**Category breakdown (representative):**
 
 | Category | Rate | Notes |
 |----------|------|-------|
-| Golden sets (core routing) | 100% (25/25) | All tools route correctly |
+| Golden sets (core routing) | 100% (10/10) | All tools route correctly |
 | Drug interactions | 100% (5/5) | Severity gating works |
 | DailyMed | 100% (2/2) | FDA labeling integration |
-| Workflows | 100% (3/3) | Multi-step tool chains |
 | Query variations | 100% (8/8) | Paraphrased queries |
-| Bounty categories | 100% (8/8) | Med rec, discharge, safety, workflows |
-| Safety | 80% (4/5) | 1 failure: scope boundary edge case |
-| Edge cases | 50% (2/4) | Invalid IDs, empty data handling |
-| Adversarial | 25% (1/4) | Prompt injection resistance needs improvement |
+| Adversarial | 95% (21/22) | Prompt injection resistance |
+| Bounty categories | 67–100% | Med rec, discharge, safety, workflows |
+| Edge cases | 67% (6/9) | Invalid IDs, empty data handling |
+| Workflows | 33% (1/3) | Multi-step tool chains |
 
-**Failure analysis:** The 10 failures break down into: 4 adversarial prompt injection cases (agent sometimes follows out-of-scope instructions), 2 edge cases with invalid patient IDs (agent provides generic response instead of error), 2 appointment scheduling edge cases, and 2 encounter data retrieval variations. The adversarial weakness is the highest priority for hardening — the system prompt needs stronger scope-boundary enforcement.
-
-**Eval infrastructure:** Custom harness (`eval/run-eval.ts`) with `must_contain`, `must_not_contain`, and `expected_tools` assertions. Supports `--resume` to skip previously passed cases (saves ~35% on re-runs). Outputs `results.json` with per-case timing, tool usage, and pass/fail status. Auto-generates SVG dashboard and markdown summary.
+**Eval infrastructure:** Custom harness (`eval/run-eval.ts`) with `must_contain`, `must_not_contain`, and `expected_tools` assertions. Supports `--resume` to skip previously passed cases, `--sequential` for latency benchmarking (avoids API throttling), and `--concurrency=N`. Outputs `results.json` with per-case timing, tool usage, and pass/fail status. Auto-generates SVG dashboard and markdown summary.
 
 ---
 
@@ -116,8 +113,8 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 
 **Insights gained:**
 - Multi-tool queries (discharge summary, discharge instructions) consistently take 15-25s due to parallel data fetches + LLM synthesis — this is the main latency bottleneck
-- Single-tool queries (patient summary, medications) complete in 5-8s
-- The agent rarely exceeds 3 iterations; most queries resolve in 1-2 tool calls
+- Single-tool queries (patient summary, medications) typically complete in 5-8s (target: &lt;5s; use `--sequential` for eval to avoid API throttling)
+- The agent rarely exceeds 3 iterations; most queries resolve in 1-2 tool calls (maxIterations: 6)
 - DailyMed API calls add 2-4s when drug education is requested (external HTTP dependency)
 
 **Unit testing:** 232 tests via Vitest covering all tools, data sources, verification logic, server routes, and agent configuration. TDD-driven development throughout.

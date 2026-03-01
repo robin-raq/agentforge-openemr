@@ -142,8 +142,8 @@ Agent presents plain-language instructions the patient can understand
 
 ## Technical Stats
 
-- **200+ unit tests** passing (including DailyMed client tests + discharge instructions tests)
-- **63 eval cases** covering all tools and workflows
+- **479 unit tests** passing (including DailyMed client tests + discharge instructions tests)
+- **125 eval cases** covering all tools and workflows
 - **10 tools** total (5 original + 5 bounty)
 - **3 new server endpoints** for document CRUD
 - **2 data sources**: OpenEMR (FHIR R4) + DailyMed (NLM/NIH REST API)
@@ -165,10 +165,10 @@ Agent presents plain-language instructions the patient can understand
 | `src/verification/verification.ts` | +med rec, discharge, discharge instructions, save alerts, DailyMed source |
 | `src/agent.ts` | +5 tools, updated system prompt with patient vs clinician distinction |
 | `src/server.ts` | +finalize, get, delete document endpoints |
-| `public/index.html` | +quick prompts, tool badges, finalize button, discharge instructions button |
+| `public/index.html`, `public/js/chat.js`, `public/css/chat.css` | +quick prompts, tool badges, finalize button, discharge instructions button |
 | `src/data/fhir-datasource.ts` | +Encounter, DocumentReference, admission meds |
 | `src/data/fhir-mappers.ts` | +mapFhirEncounters, mapFhirAdmissionMedications |
 | `src/data/fhir-auth.ts` | +FHIR_SCOPES with Encounter + DocumentReference |
 | `tests/data/dailymed-client.test.ts` | NEW -- 11 tests (7 unit + 4 integration) |
 | `tests/tools/generate-discharge-instructions.test.ts` | NEW -- 15 tests |
-| `eval/test-cases.json` | +16 bounty eval cases (12 original + 4 discharge instructions) |
+| `eval/test-cases.json` | 125 eval cases (golden sets, bounty tools, adversarial, edge, workflows) |

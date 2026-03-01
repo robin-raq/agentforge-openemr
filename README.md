@@ -8,7 +8,7 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 ![Architecture Diagram](docs/architecture-diagram.svg)
 
-**Agent:** LangChain.js + Claude Sonnet 4 using `createToolCallingAgent` with native tool-calling. The agent reasons over clinical queries, selects from 10 tools, executes multi-step workflows (up to 10 iterations), and synthesizes results with source attribution and safety verification.
+**Agent:** LangChain.js + Claude Sonnet 4 using `createToolCallingAgent` with native tool-calling. The agent reasons over clinical queries, selects from 10 tools, executes multi-step workflows (up to 6 iterations), and synthesizes results with source attribution and safety verification.
 
 **10 Tools:**
 
@@ -67,26 +67,26 @@ Patient-friendly instructions with DailyMed drug education, warning signs, and a
 
 ![Eval Results](docs/eval-results-summary.svg)
 
-**79 eval cases** across 17 categories — **87.3% pass rate** (69/79) on all 10 tools. p50 latency: 7.2s, p95: 28.7s.
+**125 eval cases** across 25+ categories — **87.2% pass rate** (109/125) on all 10 tools. p50 latency: 6.8s, p95: 21.6s.
 
 | Category | Passed | Total | Rate |
 |----------|--------|-------|------|
-| Golden Sets | 25 | 25 | 100% |
+| Golden Sets | 10 | 10 | 100% |
 | Query Variation | 8 | 8 | 100% |
 | Drug Interactions | 5 | 5 | 100% |
 | Complex Queries | 4 | 4 | 100% |
 | DailyMed | 2 | 2 | 100% |
-| Workflows | 3 | 3 | 100% |
+| Adversarial | 21 | 22 | 95% |
 | Bounty: Med Rec | 2 | 2 | 100% |
 | Bounty: Discharge | 2 | 2 | 100% |
 | Bounty: Workflows | 2 | 2 | 100% |
 | Bounty: Safety | 2 | 2 | 100% |
-| Safety | 4 | 5 | 80% |
-| Discharge Instructions | 3 | 4 | 75% |
+| Safety | 5 | 7 | 71% |
+| Bounty: Discharge Instructions | 3 | 4 | 75% |
 | Appointments | 2 | 3 | 67% |
 | Bounty: Encounters | 2 | 3 | 67% |
-| Edge Cases | 2 | 4 | 50% |
-| Adversarial | 1 | 4 | 25% |
+| Edge Cases | 6 | 9 | 67% |
+| Workflows | 1 | 3 | 33% |
 
 See [evals.md](evals.md) for the full eval framework docs.
 
@@ -130,8 +130,8 @@ Open http://localhost:3000 (local) or https://agent-production-6f7a.up.railway.a
 ## Test
 
 ```bash
-npm test       # Run 232 unit tests (Vitest)
-npm run eval   # Run 79 eval cases (requires ANTHROPIC_API_KEY)
+npm test       # Run 479 unit tests (Vitest)
+npm run eval   # Run 125 eval cases (requires ANTHROPIC_API_KEY)
 ```
 
 ## FHIR Data Source (OpenEMR Docker)
@@ -160,7 +160,7 @@ See [SECURITY.md](SECURITY.md) for the full security audit and remediation check
 - [x] Conversation history maintained
 - [x] Basic error handling
 - [x] Domain-specific verification (drug interaction severity gate)
-- [x] 50+ eval test cases (79 implemented)
+- [x] 50+ eval test cases (125 implemented)
 - [x] Deployed and publicly accessible (Railway)
 - [x] BOUNTY.md with customer, features, data source, impact
 - [x] New data source (DailyMed REST API)
