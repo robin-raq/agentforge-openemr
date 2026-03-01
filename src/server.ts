@@ -186,8 +186,8 @@ export function loadSessionsFromDisk(): void {
       }
       console.log(`Loaded ${sessionHistory.size} sessions from disk`);
     }
-  } catch {
-    // Start fresh if file is corrupt
+  } catch (err) {
+    console.warn("Failed to load sessions from disk (starting fresh):", err);
   }
 }
 
@@ -466,7 +466,8 @@ export function createApp(): express.Express {
       }
       const doc = await dataSource.updateDocument(req.params.id, updates);
       res.json({ success: true, document: doc, message: "Document finalized and saved to chart." });
-    } catch {
+    } catch (err) {
+      console.warn(`Document finalize failed [${req.params.id}]:`, err);
       res.status(404).json({ error: "Document not found or already finalized." });
     }
   });
@@ -485,7 +486,8 @@ export function createApp(): express.Express {
       }
       const doc = await dataSource.updateDocument(req.params.id, { content: req.body.content });
       res.json(doc);
-    } catch {
+    } catch (err) {
+      console.warn(`Document update failed [${req.params.id}]:`, err);
       res.status(404).json({ error: "Document not found." });
     }
   });
@@ -495,7 +497,8 @@ export function createApp(): express.Express {
     try {
       const doc = await dataSource.getDocument(req.params.id);
       res.json(doc);
-    } catch {
+    } catch (err) {
+      console.warn(`Document get failed [${req.params.id}]:`, err);
       res.status(404).json({ error: "Document not found." });
     }
   });
@@ -505,7 +508,8 @@ export function createApp(): express.Express {
     try {
       const result = await dataSource.deleteDocument(req.params.id);
       res.json(result);
-    } catch {
+    } catch (err) {
+      console.warn(`Document delete failed [${req.params.id}]:`, err);
       res.status(404).json({ error: "Document not found." });
     }
   });
