@@ -467,6 +467,29 @@ describe("server", () => {
     });
   });
 
+  describe("Content-Type validation", () => {
+    it("rejects POST with text/plain Content-Type with 415", async () => {
+      const res = await makeRequest(app, "POST", "/api/chat", undefined, {
+        "Content-Type": "text/plain",
+      });
+      expect(res.status).toBe(415);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("application/json");
+    });
+
+    it("rejects PUT with text/plain Content-Type with 415", async () => {
+      const res = await makeRequest(app, "PUT", "/api/documents/test-doc", undefined, {
+        "Content-Type": "text/plain",
+      });
+      expect(res.status).toBe(415);
+    });
+
+    it("allows GET requests without Content-Type check", async () => {
+      const res = await makeRequest(app, "GET", "/api/health");
+      expect(res.status).toBe(200);
+    });
+  });
+
   describe("session disk persistence", () => {
     it("loadSessionsFromDisk does not throw when no file exists", () => {
       expect(() => loadSessionsFromDisk()).not.toThrow();

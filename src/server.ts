@@ -18,6 +18,7 @@ import {
   COMPREHENSIVE_TOOLS,
   SINGLE_TOOL_TARGET_MS,
   MULTI_STEP_TARGET_MS,
+  SESSION_TTL_MS,
 } from "./constants";
 
 /**
@@ -146,6 +147,22 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW_MS);
 
+// Periodic cleanup of stale sessions (older than SESSION_TTL_MS)
+const SESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  let removed = 0;
+  for (const [key, session] of sessionHistory) {
+    if (now - session.lastAccess > SESSION_TTL_MS) {
+      sessionHistory.delete(key);
+      removed++;
+    }
+  }
+  if (removed > 0) {
+    console.log(`Session cleanup: removed ${removed} stale sessions. Active: ${sessionHistory.size}`);
+  }
+}, SESSION_CLEANUP_INTERVAL_MS);
+
 export function getSessionHistory(sessionId: string): HistoryEntry[] {
   const session = sessionHistory.get(sessionId);
   if (!session) return [];
@@ -227,6 +244,15 @@ export function createApp(): express.Express {
     app.use(cors({ origin: allowedOrigins, credentials: true }));
   }
   app.use(express.json({ limit: "50kb" }));
+
+  // Validate Content-Type on POST/PUT requests
+  app.use((req, res, next) => {
+    if ((req.method === "POST" || req.method === "PUT") && !req.is("json")) {
+      res.status(415).json({ error: "Content-Type must be application/json" });
+      return;
+    }
+    next();
+  });
 
   // Security headers
   app.use((_req, res, next) => {
@@ -528,7 +554,36 @@ if (!process.env.VITEST) {
   initLangfuse();
   loadSessionsFromDisk();
   const app = createApp();
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`OpenEMR Clinical Query Agent running on http://localhost:${PORT}`);
   });
+
+  // Graceful shutdown: persist sessions and close server on SIGTERM/SIGINT
+  function gracefulShutdown(signal: string) {
+    console.log(`${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      // Persist sessions to disk synchronously before exit
+      try {
+        const sessionsObj: Record<string, unknown> = {};
+        for (const [id, session] of sessionHistory) sessionsObj[id] = session;
+        const dir = path.dirname(SESSIONS_FILE);
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        writeFileSync(SESSIONS_FILE, JSON.stringify(sessionsObj), "utf-8");
+        console.log(`Sessions persisted to disk (${sessionHistory.size} sessions).`);
+      } catch (err) {
+        console.warn("Failed to persist sessions on shutdown:", err);
+      }
+      console.log("Server closed.");
+      process.exit(0);
+    });
+
+    // Force exit if graceful shutdown hangs
+    setTimeout(() => {
+      console.error("Forceful shutdown after 10s timeout.");
+      process.exit(1);
+    }, 10_000);
+  }
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
