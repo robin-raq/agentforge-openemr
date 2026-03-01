@@ -100,6 +100,14 @@ export interface ChatResponsePayload {
   tool_calls: ChatResult["toolCalls"];
   verification_flags: string[];
   reasoning_steps: string[];
+  token_usage: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cache_read_tokens: number;
+    cache_creation_tokens: number;
+    estimated_cost_usd: number;
+  };
   timing: {
     total_ms: number;
     llm_ms: number;
@@ -165,11 +173,23 @@ export function buildChatResponse(result: ChatResult): ChatResponsePayload {
     isComprehensiveReport,
   });
 
+  // Claude Sonnet 4 pricing: $3/M input, $15/M output
+  const tu = result.tokenUsage;
+  const estimatedCostUsd = parseFloat(((tu.input_tokens * 3 + tu.output_tokens * 15) / 1_000_000).toFixed(6));
+
   return {
     response: result.response,
     tool_calls: result.toolCalls,
     verification_flags: result.safetyAlerts,
     reasoning_steps: result.reasoningSteps,
+    token_usage: {
+      input_tokens: tu.input_tokens,
+      output_tokens: tu.output_tokens,
+      total_tokens: tu.total_tokens,
+      cache_read_tokens: tu.cache_read_tokens,
+      cache_creation_tokens: tu.cache_creation_tokens,
+      estimated_cost_usd: estimatedCostUsd,
+    },
     timing: {
       total_ms: result.durationMs,
       llm_ms: llmInferenceMs,
@@ -536,7 +556,28 @@ export function createApp(): express.Express {
     }
   });
 
-  // Feedback endpoint
+  // Feedback endpoint — persists to data/feedback.json
+  const FEEDBACK_FILE = path.join(__dirname, "../data/feedback.json");
+
+  function loadFeedback(): Array<Record<string, unknown>> {
+    try {
+      if (existsSync(FEEDBACK_FILE)) {
+        return JSON.parse(readFileSync(FEEDBACK_FILE, "utf-8"));
+      }
+    } catch { /* corrupt file — start fresh */ }
+    return [];
+  }
+
+  function saveFeedback(entries: Array<Record<string, unknown>>): void {
+    try {
+      const dir = path.dirname(FEEDBACK_FILE);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(FEEDBACK_FILE, JSON.stringify(entries, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Failed to save feedback:", err);
+    }
+  }
+
   app.post("/api/feedback", (req, res) => {
     const { session_id, message_index, rating, comment } = req.body;
     if (!session_id || typeof session_id !== "string") {
@@ -547,8 +588,22 @@ export function createApp(): express.Express {
       res.status(404).json({ error: "Unknown session" });
       return;
     }
-    console.log("Feedback received:", { session_id, message_index, rating, comment });
+    const entry = {
+      session_id,
+      message_index,
+      rating,
+      comment: comment || null,
+      timestamp: new Date().toISOString(),
+    };
+    console.log("Feedback received:", entry);
+    const all = loadFeedback();
+    all.push(entry);
+    saveFeedback(all);
     res.json({ status: "ok" });
+  });
+
+  app.get("/api/feedback", (_req, res) => {
+    res.json(loadFeedback());
   });
 
   // SEC-003: Document ID validation helper

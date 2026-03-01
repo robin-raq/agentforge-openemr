@@ -1017,26 +1017,32 @@
     }
     .sr-confidence-bar {
       flex: 1;
-      height: 8px;
+      height: 24px;
       background: #e2e8f0;
-      border-radius: 4px;
+      border-radius: 6px;
       overflow: hidden;
+      position: relative;
     }
     .sr-confidence-fill {
       height: 100%;
-      border-radius: 4px;
+      border-radius: 6px;
       transition: width 0.4s ease;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      min-width: 60px;
+    }
+    .sr-confidence-fill .sr-conf-inner {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.2);
     }
     .sr-conf-high { background: #16a34a; color: #16a34a; }
     .sr-conf-med { background: #f59e0b; color: #f59e0b; }
     .sr-conf-low { background: #ef4444; color: #ef4444; }
-    .sr-confidence-pct {
-      font-size: 0.8125rem;
-      font-weight: 700;
-      width: 40px;
-      text-align: right;
-      flex-shrink: 0;
-    }
     .sr-checks-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1351,6 +1357,13 @@
             <div class="obs-stat-label">Tool Success</div>
           </div>
         </div>
+        <div id="obs-token-usage" style="margin-top:0.5rem;padding:6px 8px;background:#f8fafc;border-radius:6px;font-size:0.75rem;color:#475569;display:none">
+          <div style="font-weight:600;margin-bottom:4px;color:#334155">Token Usage</div>
+          <div style="display:flex;justify-content:space-between"><span>Input:</span><span id="obs-input-tokens">0</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Output:</span><span id="obs-output-tokens">0</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Cache Read:</span><span id="obs-cache-tokens">0</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;padding-top:4px;border-top:1px solid #e2e8f0;font-weight:600"><span>Est. Cost:</span><span id="obs-est-cost">$0.000000</span></div>
+        </div>
         <div class="obs-latency-dist" id="obs-latency-dist" style="display:none"></div>
       </div>
     </div>
@@ -1491,6 +1504,11 @@
       responseLog: [], // per-response metadata for persistence
       confidenceScores: [],  // all confidence scores for avg computation
       lastQuery: null, // last user query for "Last Request" display
+      // Token usage tracking
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCostUsd: 0,
+      cacheReadTokens: 0,
       // Performance target tracking
       perf: {
         singleToolLatencies: [],  // latencies for 1-tool queries
@@ -1508,7 +1526,9 @@
             toolUsage: this.toolUsage, toolLatencies: this.toolLatencies, toolLatencyMap: this.toolLatencyMap,
             safetyAlerts: this.safetyAlerts, recentErrors: this.recentErrors,
             responseLog: this.responseLog, confidenceScores: this.confidenceScores,
-            lastQuery: this.lastQuery, perf: this.perf
+            lastQuery: this.lastQuery, perf: this.perf,
+            totalInputTokens: this.totalInputTokens, totalOutputTokens: this.totalOutputTokens,
+            totalCostUsd: this.totalCostUsd, cacheReadTokens: this.cacheReadTokens
           }));
         } catch (e) { /* localStorage full or unavailable */ }
       },
@@ -1528,6 +1548,10 @@
           this.responseLog = d.responseLog || [];
           this.confidenceScores = d.confidenceScores || [];
           this.lastQuery = d.lastQuery || null;
+          this.totalInputTokens = d.totalInputTokens || 0;
+          this.totalOutputTokens = d.totalOutputTokens || 0;
+          this.totalCostUsd = d.totalCostUsd || 0;
+          this.cacheReadTokens = d.cacheReadTokens || 0;
           if (d.perf) {
             this.perf.singleToolLatencies = d.perf.singleToolLatencies || [];
             this.perf.multiStepLatencies = d.perf.multiStepLatencies || [];
@@ -1545,6 +1569,8 @@
         this.toolUsage = {}; this.toolLatencies = []; this.toolLatencyMap = {};
         this.safetyAlerts = 0; this.recentErrors = []; this.responseLog = [];
         this.confidenceScores = []; this.lastQuery = null;
+        this.totalInputTokens = 0; this.totalOutputTokens = 0;
+        this.totalCostUsd = 0; this.cacheReadTokens = 0;
         this.perf = { singleToolLatencies: [], multiStepLatencies: [], toolExpected: 0, toolSucceeded: 0, hallucinationCount: 0, verificationCorrect: 0, totalVerified: 0 };
         this.save(); this.render();
       },
@@ -1591,6 +1617,13 @@
         }
         if (data && data.structured_result && data.structured_result.confidence_score != null) {
           this.confidenceScores.push(data.structured_result.confidence_score);
+        }
+        // Token usage tracking
+        if (data && data.token_usage) {
+          this.totalInputTokens += data.token_usage.input_tokens || 0;
+          this.totalOutputTokens += data.token_usage.output_tokens || 0;
+          this.totalCostUsd += data.token_usage.estimated_cost_usd || 0;
+          this.cacheReadTokens += data.token_usage.cache_read_tokens || 0;
         }
         if (data) {
           this.responseLog.push({
@@ -1641,6 +1674,16 @@
           toolSuccessEl.textContent = tsRate + '%';
           toolSuccessEl.className = 'obs-stat-value' + (tsRate >= 95 ? '' : ' error');
         } else { toolSuccessEl.textContent = '\u2014'; }
+
+        // Token usage
+        var tokenEl = document.getElementById('obs-token-usage');
+        if (this.totalInputTokens > 0 || this.totalOutputTokens > 0) {
+          tokenEl.style.display = 'block';
+          document.getElementById('obs-input-tokens').textContent = this.totalInputTokens.toLocaleString();
+          document.getElementById('obs-output-tokens').textContent = this.totalOutputTokens.toLocaleString();
+          document.getElementById('obs-cache-tokens').textContent = this.cacheReadTokens.toLocaleString();
+          document.getElementById('obs-est-cost').textContent = '$' + this.totalCostUsd.toFixed(6);
+        } else { tokenEl.style.display = 'none'; }
 
         var avg = this.avgLatency();
         document.getElementById('obs-avg-latency').textContent = fmtDur(avg);
@@ -2229,8 +2272,7 @@
         if (conf) {
           html += '<div class="sr-confidence-row">';
           html += '<span class="sr-confidence-label">Confidence</span>';
-          html += '<div class="sr-confidence-bar"><div class="sr-confidence-fill sr-conf-' + conf.cls + '" style="width:' + conf.pct + '%"></div></div>';
-          html += '<span class="sr-confidence-pct sr-conf-' + conf.cls + '">' + conf.pct + '%</span>';
+          html += '<div class="sr-confidence-bar"><div class="sr-confidence-fill sr-conf-' + conf.cls + '" style="width:' + conf.pct + '%"><span class="sr-conf-inner">\u{1F3AF} ' + conf.pct + '%</span></div></div>';
           html += '</div>';
         }
         // Verification checks grid

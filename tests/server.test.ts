@@ -558,6 +558,8 @@ describe("server", () => {
         toolCalls: [{ name: "get_patient_summary", args: { patient_id: "1" } }],
         safetyAlerts: [],
         toolTraces: [{ tool: "get_patient_summary", duration_ms: 50, started_at: Date.now() }],
+        reasoningSteps: [],
+        tokenUsage: { input_tokens: 0, output_tokens: 0, total_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
         durationMs: 1200,
         ...overrides,
       };

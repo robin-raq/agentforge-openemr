@@ -39,15 +39,24 @@ export interface ToolTrace {
  *   handleToolEnd(output, runId, parentRunId?, tags?)
  *   handleLLMEnd(output, runId, parentRunId?, tags?)
  */
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+}
+
 export class ToolTimingCallbackHandler extends BaseCallbackHandler {
   name = "tool_timing";
   private pending: Map<string, number> = new Map();
   private toolNames: Map<string, string> = new Map();
   traces: ToolTrace[] = [];
   reasoningSteps: string[] = [];
+  tokenUsage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 };
 
   async handleLLMEnd(
-    output: { generations?: Array<Array<{ text?: string; message?: { content?: unknown } }>> },
+    output: { generations?: Array<Array<{ text?: string; message?: { content?: unknown; usage_metadata?: Record<string, number>; response_metadata?: Record<string, unknown> } }>>; llmOutput?: Record<string, unknown> },
   ): Promise<void> {
     // Extract text reasoning from the LLM response content blocks.
     // Claude's tool-calling responses include text blocks (reasoning) alongside tool_use blocks.
@@ -63,6 +72,20 @@ export class ToolTimingCallbackHandler extends BaseCallbackHandler {
     } else if (gen?.text) {
       const text = gen.text.trim();
       if (text) this.reasoningSteps.push(text);
+    }
+
+    // Extract token usage from LangChain's Anthropic adapter.
+    // usage_metadata: { input_tokens, output_tokens, total_tokens, input_token_details: { cache_read, cache_creation } }
+    const usageMeta = gen?.message?.usage_metadata as Record<string, unknown> | undefined;
+    if (usageMeta) {
+      this.tokenUsage.input_tokens += (usageMeta.input_tokens as number) || 0;
+      this.tokenUsage.output_tokens += (usageMeta.output_tokens as number) || 0;
+      this.tokenUsage.total_tokens += (usageMeta.total_tokens as number) || 0;
+      const details = usageMeta.input_token_details as Record<string, number> | undefined;
+      if (details) {
+        this.tokenUsage.cache_read_tokens += details.cache_read || 0;
+        this.tokenUsage.cache_creation_tokens += details.cache_creation || 0;
+      }
     }
   }
 
@@ -222,6 +245,7 @@ export interface ChatResult {
   safetyAlerts: string[];
   toolTraces: ToolTrace[];
   reasoningSteps: string[];
+  tokenUsage: TokenUsage;
   durationMs: number;
 }
 
@@ -318,6 +342,7 @@ export async function chat(
       safetyAlerts: verification.safetyAlerts,
       toolTraces: timingHandler.traces,
       reasoningSteps: timingHandler.reasoningSteps,
+      tokenUsage: timingHandler.tokenUsage,
       durationMs,
     };
   } catch (err) {
@@ -335,6 +360,7 @@ export async function chat(
       safetyAlerts: verification.safetyAlerts,
       toolTraces: timingHandler.traces,
       reasoningSteps: timingHandler.reasoningSteps,
+      tokenUsage: timingHandler.tokenUsage,
       durationMs: Date.now() - requestStartTime,
     };
   }
