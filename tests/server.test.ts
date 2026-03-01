@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
 
-import { createApp, setSessionHistory, detectInjection, getSessionHistory, loadSessionsFromDisk, schedulePersist } from "../src/server";
+import { createApp, setSessionHistory, detectInjection, getSessionHistory, loadSessionsFromDisk, schedulePersist, buildChatResponse } from "../src/server";
 import { getDataSource } from "../src/config";
+import type { ChatResult } from "../src/agent";
 
 const originalEnv = { ...process.env };
 
@@ -547,6 +548,97 @@ describe("server", () => {
 
     it("does NOT flag medication reconciliation requests", () => {
       expect(detectInjection("Reconcile medications for patient 1's encounter")).toBe(false);
+    });
+  });
+
+  describe("buildChatResponse", () => {
+    function makeChatResult(overrides: Partial<ChatResult> = {}): ChatResult {
+      return {
+        response: "Patient summary\n\nSources: OpenEMR Patient Records\n\n⚕️ This information is for reference only and does not constitute medical advice.",
+        toolCalls: [{ name: "get_patient_summary", args: { patient_id: "1" } }],
+        safetyAlerts: [],
+        toolTraces: [{ tool: "get_patient_summary", duration_ms: 50, started_at: Date.now() }],
+        durationMs: 1200,
+        ...overrides,
+      };
+    }
+
+    it("returns correct query_type 'single_tool' for 1-tool result", () => {
+      const payload = buildChatResponse(makeChatResult());
+      expect(payload.performance.query_type).toBe("single_tool");
+      expect(payload.timing.tool_count).toBe(1);
+    });
+
+    it("returns correct query_type 'multi_step' for 3+ tool result", () => {
+      const payload = buildChatResponse(makeChatResult({
+        toolCalls: [
+          { name: "get_patient_summary", args: {} },
+          { name: "get_medications", args: {} },
+          { name: "drug_interaction_check", args: {} },
+        ],
+        toolTraces: [
+          { tool: "get_patient_summary", duration_ms: 30, started_at: Date.now() },
+          { tool: "get_medications", duration_ms: 20, started_at: Date.now() },
+          { tool: "drug_interaction_check", duration_ms: 40, started_at: Date.now() },
+        ],
+      }));
+      expect(payload.performance.query_type).toBe("multi_step");
+    });
+
+    it("returns correct sources array for patient tools", () => {
+      const payload = buildChatResponse(makeChatResult());
+      expect(payload.structured_result.sources).toContain("OpenEMR Patient Records");
+    });
+
+    it("includes FDA source when drug_interaction_check is used", () => {
+      const payload = buildChatResponse(makeChatResult({
+        toolCalls: [{ name: "drug_interaction_check", args: {} }],
+        toolTraces: [{ tool: "drug_interaction_check", duration_ms: 100, started_at: Date.now() }],
+      }));
+      expect(payload.structured_result.sources).toContain("OpenFDA Drug Interaction Database");
+    });
+
+    it("confidence_score is in valid range 0-1", () => {
+      const payload = buildChatResponse(makeChatResult());
+      expect(payload.structured_result.confidence_score).toBeGreaterThanOrEqual(0);
+      expect(payload.structured_result.confidence_score).toBeLessThanOrEqual(1);
+    });
+
+    it("sets needs_escalation when safety alert contains CRITICAL", () => {
+      const payload = buildChatResponse(makeChatResult({
+        safetyAlerts: ["⚠️ CRITICAL LAB: INR = 5.2 (ref: 2.0-3.0)"],
+      }));
+      expect(payload.structured_result.verification.needs_escalation).toBe(true);
+    });
+
+    it("computes timing breakdown correctly", () => {
+      const payload = buildChatResponse(makeChatResult({
+        durationMs: 2000,
+        toolTraces: [{ tool: "get_patient_summary", duration_ms: 800, started_at: Date.now() }],
+      }));
+      expect(payload.timing.total_ms).toBe(2000);
+      expect(payload.timing.tool_ms).toBe(800);
+      expect(payload.timing.llm_ms).toBe(1200);
+    });
+
+    it("returns zero_or_two_tool for 0 or 2 tool calls", () => {
+      const payloadZero = buildChatResponse(makeChatResult({
+        toolCalls: [],
+        toolTraces: [],
+      }));
+      expect(payloadZero.performance.query_type).toBe("zero_or_two_tool");
+
+      const payloadTwo = buildChatResponse(makeChatResult({
+        toolCalls: [
+          { name: "get_patient_summary", args: {} },
+          { name: "get_medications", args: {} },
+        ],
+        toolTraces: [
+          { tool: "get_patient_summary", duration_ms: 30, started_at: Date.now() },
+          { tool: "get_medications", duration_ms: 20, started_at: Date.now() },
+        ],
+      }));
+      expect(payloadTwo.performance.query_type).toBe("zero_or_two_tool");
     });
   });
 });

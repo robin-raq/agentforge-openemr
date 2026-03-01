@@ -4,6 +4,7 @@ import path from "path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { chat } from "./agent";
+import type { ChatResult } from "./agent";
 import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls, getDataSource } from "./config";
 import type { DataSource } from "./data/datasource";
 import {
@@ -88,6 +89,152 @@ function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       final,
     },
   };
+}
+
+/**
+ * Build the full JSON response payload from a ChatResult.
+ * Pure function — no side effects, fully testable.
+ */
+export interface ChatResponsePayload {
+  response: string;
+  tool_calls: ChatResult["toolCalls"];
+  verification_flags: string[];
+  timing: {
+    total_ms: number;
+    llm_ms: number;
+    tool_ms: number;
+    tool_count: number;
+    tool_traces: ChatResult["toolTraces"];
+  };
+  structured_result: {
+    tools_called: string[];
+    confidence_score: number;
+    sources: string[];
+    trace_id: string;
+    latency_ms: number;
+    llm_inference_ms: number;
+    tool_execution_ms: number;
+    verification: Record<string, unknown>;
+  };
+  performance: {
+    query_type: string;
+    tool_count: number;
+    latency_ms: number;
+    latency_target_ms: number | null;
+    meets_latency_target: boolean | null;
+    tool_success: boolean;
+    has_source_citation: boolean;
+    has_disclaimer: boolean;
+    has_scope_warning: boolean;
+  };
+}
+
+export function buildChatResponse(result: ChatResult): ChatResponsePayload {
+  const toolNames = result.toolCalls.map((tc) => tc.name);
+  const sources: string[] = [];
+  if (toolNames.some((n) => PATIENT_TOOLS.has(n))) sources.push("OpenEMR Patient Records");
+  if (toolNames.some((n) => FDA_TOOLS.has(n))) sources.push("OpenFDA Drug Interaction Database");
+  if (toolNames.some((n) => DAILYMED_TOOLS.has(n))) sources.push("DailyMed (NLM/NIH)");
+
+  const hasEscalation = result.safetyAlerts.some((a) => /CRITICAL|SAFETY ALERT/i.test(a));
+  const hasSources = /Sources:/i.test(result.response);
+  const hasDisclaimer = /reference only|medical advice/i.test(result.response);
+  const hasScopeWarning = result.safetyAlerts.some((a) => /SCOPE WARNING/i.test(a));
+
+  const toolSumMs = result.toolTraces.reduce((s, t) => s + t.duration_ms, 0);
+  const llmInferenceMs = Math.max(0, result.durationMs - toolSumMs);
+
+  const toolCount = result.toolCalls.length;
+  const isSingleTool = toolCount === 1;
+  const isMultiStep = toolCount >= 3;
+
+  const latencyTarget = isSingleTool ? SINGLE_TOOL_TARGET_MS : isMultiStep ? MULTI_STEP_TARGET_MS : null;
+  const meetsLatencyTarget = latencyTarget !== null ? result.durationMs < latencyTarget : null;
+
+  const isComprehensiveReport = toolNames.some((n) => COMPREHENSIVE_TOOLS.has(n));
+
+  const confidence = computeConfidence({
+    toolCount,
+    hasSources,
+    hasDisclaimer,
+    hasScopeWarning,
+    hasEscalation,
+    safetyAlertCount: result.safetyAlerts.length,
+    isMultiTool: isMultiStep,
+    isComprehensiveReport,
+  });
+
+  return {
+    response: result.response,
+    tool_calls: result.toolCalls,
+    verification_flags: result.safetyAlerts,
+    timing: {
+      total_ms: result.durationMs,
+      llm_ms: llmInferenceMs,
+      tool_ms: toolSumMs,
+      tool_count: toolCount,
+      tool_traces: result.toolTraces,
+    },
+    structured_result: {
+      tools_called: toolNames,
+      confidence_score: confidence.score,
+      sources,
+      trace_id: randomUUID().slice(0, 12),
+      latency_ms: result.durationMs,
+      llm_inference_ms: llmInferenceMs,
+      tool_execution_ms: toolSumMs,
+      verification: {
+        has_sources: hasSources,
+        has_disclaimer: hasDisclaimer,
+        confidence: confidence.score,
+        flags: result.safetyAlerts,
+        needs_escalation: hasEscalation,
+        hallucination_risk: hasScopeWarning ? 1 : 0,
+        domain_violations: hasScopeWarning ? ["scope_warning"] : [],
+        output_valid: !hasScopeWarning,
+        verification_checks: {
+          hallucination_detection: !hasScopeWarning,
+          source_grounding: hasSources,
+          domain_constraints: !hasScopeWarning,
+          output_validation: true,
+          confidence_scoring: true,
+        },
+        verification_details: {
+          hallucination_risk: hasScopeWarning ? 1 : 0,
+          confidence_breakdown: confidence.breakdown,
+          domain_violations: hasScopeWarning ? ["scope_warning"] : [],
+          emergency_detected: hasEscalation,
+          sources_found: hasSources,
+          source_grounding_pass: hasSources,
+          output_warnings: result.safetyAlerts.filter((a) => /SCOPE WARNING/i.test(a)),
+          checks_passed: [!hasScopeWarning, hasSources, !hasScopeWarning, true, true].filter(Boolean).length,
+          checks_total: 5,
+        },
+      },
+    },
+    performance: {
+      query_type: isMultiStep ? "multi_step" : isSingleTool ? "single_tool" : "zero_or_two_tool",
+      tool_count: toolCount,
+      latency_ms: result.durationMs,
+      latency_target_ms: latencyTarget,
+      meets_latency_target: meetsLatencyTarget,
+      tool_success: toolCount > 0,
+      has_source_citation: hasSources,
+      has_disclaimer: hasDisclaimer,
+      has_scope_warning: hasScopeWarning,
+    },
+  };
+}
+
+/**
+ * Flush Langfuse callback handlers (if any) to ensure traces are persisted.
+ */
+export async function flushLangfuse(callbacks: unknown[]): Promise<void> {
+  for (const cb of callbacks) {
+    if (cb && typeof (cb as any).flushAsync === "function") {
+      await (cb as any).flushAsync();
+    }
+  }
 }
 
 function getOpenEmrOrigins(): string | undefined {
@@ -338,118 +485,14 @@ export function createApp(): express.Express {
       const callbacks = getLangfuseCallbacks(sessionId);
 
       const result = await chat(effectiveMessage, sessionId, history, callbacks);
-
-      // Flush Langfuse traces before responding
-      for (const cb of callbacks) {
-        if (cb && typeof (cb as any).flushAsync === "function") {
-          await (cb as any).flushAsync();
-        }
-      }
+      await flushLangfuse(callbacks);
 
       // chat() mutates history with user + assistant messages
       setSessionHistory(sessionId, history);
       evictOldSessions();
       schedulePersist();
 
-      // Build structured result for observability (inspired by clinical agent best practices)
-      const toolNames = result.toolCalls.map((tc) => tc.name);
-      const sources: string[] = [];
-      if (toolNames.some((n) => PATIENT_TOOLS.has(n))) sources.push("OpenEMR Patient Records");
-      if (toolNames.some((n) => FDA_TOOLS.has(n))) sources.push("OpenFDA Drug Interaction Database");
-      if (toolNames.some((n) => DAILYMED_TOOLS.has(n))) sources.push("DailyMed (NLM/NIH)");
-
-      const hasEscalation = result.safetyAlerts.some((a) => /CRITICAL|SAFETY ALERT/i.test(a));
-      const hasSources = /Sources:/i.test(result.response);
-      const hasDisclaimer = /reference only|medical advice/i.test(result.response);
-      const hasScopeWarning = result.safetyAlerts.some((a) => /SCOPE WARNING/i.test(a));
-
-      const toolSumMs = result.toolTraces.reduce((s, t) => s + t.duration_ms, 0);
-      const llmInferenceMs = Math.max(0, result.durationMs - toolSumMs);
-
-      // Classify query type for performance target tracking
-      const toolCount = result.toolCalls.length;
-      const isSingleTool = toolCount === 1;
-      const isMultiStep = toolCount >= 3;
-
-      // Performance target assessment for this request
-      const latencyTarget = isSingleTool ? SINGLE_TOOL_TARGET_MS : isMultiStep ? MULTI_STEP_TARGET_MS : null;
-      const meetsLatencyTarget = latencyTarget !== null ? result.durationMs < latencyTarget : null;
-
-      // Comprehensive reports = discharge summary, discharge instructions, or med reconciliation
-      const isComprehensiveReport = toolNames.some((n) => COMPREHENSIVE_TOOLS.has(n));
-
-      // Confidence scoring
-      const confidence = computeConfidence({
-        toolCount,
-        hasSources,
-        hasDisclaimer,
-        hasScopeWarning,
-        hasEscalation,
-        safetyAlertCount: result.safetyAlerts.length,
-        isMultiTool: isMultiStep,
-        isComprehensiveReport,
-      });
-
-      res.json({
-        response: result.response,
-        tool_calls: result.toolCalls,
-        verification_flags: result.safetyAlerts,
-        timing: {
-          total_ms: result.durationMs,
-          llm_ms: llmInferenceMs,
-          tool_ms: toolSumMs,
-          tool_count: toolCount,
-          tool_traces: result.toolTraces,
-        },
-        structured_result: {
-          tools_called: toolNames,
-          confidence_score: confidence.score,
-          sources,
-          trace_id: randomUUID().slice(0, 12),
-          latency_ms: result.durationMs,
-          llm_inference_ms: llmInferenceMs,
-          tool_execution_ms: toolSumMs,
-          verification: {
-            has_sources: hasSources,
-            has_disclaimer: hasDisclaimer,
-            confidence: confidence.score,
-            flags: result.safetyAlerts,
-            needs_escalation: hasEscalation,
-            hallucination_risk: hasScopeWarning ? 1 : 0,
-            domain_violations: hasScopeWarning ? ["scope_warning"] : [],
-            output_valid: !hasScopeWarning,
-            verification_checks: {
-              hallucination_detection: !hasScopeWarning,
-              source_grounding: hasSources,
-              domain_constraints: !hasScopeWarning,
-              output_validation: true,
-              confidence_scoring: true,
-            },
-            verification_details: {
-              hallucination_risk: hasScopeWarning ? 1 : 0,
-              confidence_breakdown: confidence.breakdown,
-              domain_violations: hasScopeWarning ? ["scope_warning"] : [],
-              emergency_detected: hasEscalation,
-              sources_found: hasSources,
-              source_grounding_pass: hasSources,
-              output_warnings: result.safetyAlerts.filter((a) => /SCOPE WARNING/i.test(a)),
-              checks_passed: [!hasScopeWarning, hasSources, !hasScopeWarning, true, true].filter(Boolean).length,
-              checks_total: 5,
-            },
-          },
-        },
-        performance: {
-          query_type: isMultiStep ? "multi_step" : isSingleTool ? "single_tool" : "zero_or_two_tool",
-          tool_count: toolCount,
-          latency_ms: result.durationMs,
-          latency_target_ms: latencyTarget,
-          meets_latency_target: meetsLatencyTarget,
-          tool_success: toolCount > 0,
-          has_source_citation: hasSources,
-          has_disclaimer: hasDisclaimer,
-          has_scope_warning: hasScopeWarning,
-        },
-      });
+      res.json(buildChatResponse(result));
     } catch (err) {
       console.error("Chat error:", err);
       res.status(500).json({
