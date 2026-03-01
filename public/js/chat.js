@@ -1,0 +1,1553 @@
+    // Session persistence: reuse session_id across page reloads via localStorage
+    const SESSION_KEY = 'agentforge_session_id';
+    const PENDING_SEND_KEY = 'agentforge_pending_send';
+    const sessionId = localStorage.getItem(SESSION_KEY) || 'session-' + crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, sessionId);
+
+    // Track which patient this chat is for — used to recommend new chat when switching patients
+    let patientIdForThisChat = null;
+
+    // --- Observability Tracker (persisted globally — only clears on explicit user action) ---
+    const OBS_STORAGE_KEY = 'agentforge_obs_global';
+
+    const obsTracker = {
+      requests: 0,
+      errors: 0,
+      latencies: [],
+      toolUsage: {},  // tool_name -> count
+      toolLatencies: [], // all tool durations in ms
+      toolLatencyMap: {}, // tool_name -> [duration_ms, ...]
+      safetyAlerts: 0,
+      recentErrors: [],
+      responseLog: [], // per-response metadata for persistence
+      confidenceScores: [],  // all confidence scores for avg computation
+      lastQuery: null, // last user query for "Last Request" display
+      isOpen: true, // sidebar starts open; skip render when closed
+      _renderPending: false, // true when render was skipped while closed
+      _saveTimer: null, // debounce timer for save()
+      // Token usage tracking
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCostUsd: 0,
+      cacheReadTokens: 0,
+      // Performance target tracking
+      perf: {
+        singleToolLatencies: [],  // latencies for 1-tool queries
+        multiStepLatencies: [],   // latencies for 3+ tool queries
+        toolExpected: 0,          // total expected tool calls
+        toolSucceeded: 0,         // total successful tool calls
+        hallucinationCount: 0,    // must_not_contain violations (scope warnings)
+        verificationCorrect: 0,   // correct verification flags
+        totalVerified: 0          // total verified responses
+      },
+      save: function() {
+        try {
+          localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify({
+            requests: this.requests, errors: this.errors, latencies: this.latencies,
+            toolUsage: this.toolUsage, toolLatencies: this.toolLatencies, toolLatencyMap: this.toolLatencyMap,
+            safetyAlerts: this.safetyAlerts, recentErrors: this.recentErrors,
+            responseLog: this.responseLog, confidenceScores: this.confidenceScores,
+            lastQuery: this.lastQuery, perf: this.perf,
+            totalInputTokens: this.totalInputTokens, totalOutputTokens: this.totalOutputTokens,
+            totalCostUsd: this.totalCostUsd, cacheReadTokens: this.cacheReadTokens
+          }));
+        } catch (e) { /* localStorage full or unavailable */ }
+      },
+      debouncedSave: function() {
+        const self = this;
+        if (self._saveTimer) clearTimeout(self._saveTimer);
+        self._saveTimer = setTimeout(function() { self.save(); }, 500);
+      },
+      load: function() {
+        try {
+          const raw = localStorage.getItem(OBS_STORAGE_KEY);
+          if (!raw) return;
+          const d = JSON.parse(raw);
+          this.requests = d.requests || 0;
+          this.errors = d.errors || 0;
+          this.latencies = d.latencies || [];
+          this.toolUsage = d.toolUsage || {};
+          this.toolLatencies = d.toolLatencies || [];
+          this.toolLatencyMap = d.toolLatencyMap || {};
+          this.safetyAlerts = d.safetyAlerts || 0;
+          this.recentErrors = d.recentErrors || [];
+          this.responseLog = d.responseLog || [];
+          this.confidenceScores = d.confidenceScores || [];
+          this.lastQuery = d.lastQuery || null;
+          this.totalInputTokens = d.totalInputTokens || 0;
+          this.totalOutputTokens = d.totalOutputTokens || 0;
+          this.totalCostUsd = d.totalCostUsd || 0;
+          this.cacheReadTokens = d.cacheReadTokens || 0;
+          if (d.perf) {
+            this.perf.singleToolLatencies = d.perf.singleToolLatencies || [];
+            this.perf.multiStepLatencies = d.perf.multiStepLatencies || [];
+            this.perf.toolExpected = d.perf.toolExpected || 0;
+            this.perf.toolSucceeded = d.perf.toolSucceeded || 0;
+            this.perf.hallucinationCount = d.perf.hallucinationCount || 0;
+            this.perf.verificationCorrect = d.perf.verificationCorrect || 0;
+            this.perf.totalVerified = d.perf.totalVerified || 0;
+          }
+          this.render();
+        } catch (e) { /* corrupt data — start fresh */ }
+      },
+      clear: function() {
+        this.requests = 0; this.errors = 0; this.latencies = [];
+        this.toolUsage = {}; this.toolLatencies = []; this.toolLatencyMap = {};
+        this.safetyAlerts = 0; this.recentErrors = []; this.responseLog = [];
+        this.confidenceScores = []; this.lastQuery = null;
+        this.totalInputTokens = 0; this.totalOutputTokens = 0;
+        this.totalCostUsd = 0; this.cacheReadTokens = 0;
+        this.perf = { singleToolLatencies: [], multiStepLatencies: [], toolExpected: 0, toolSucceeded: 0, hallucinationCount: 0, verificationCorrect: 0, totalVerified: 0 };
+        this.save(); this.render();
+      },
+      exportJSON: function() {
+        const blob = new Blob([JSON.stringify({ responseLog: this.responseLog, toolUsage: this.toolUsage, toolLatencyMap: this.toolLatencyMap, latencies: this.latencies, perf: this.perf, requests: this.requests, errors: this.errors }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'obs-export-' + new Date().toISOString().slice(0, 19) + '.json';
+        a.click(); URL.revokeObjectURL(a.href);
+      },
+      record: function(data, error) {
+        this.requests++;
+        if (error) {
+          this.errors++;
+          this.recentErrors.push({ time: new Date().toLocaleTimeString(), msg: String(error).slice(0, 100) });
+          if (this.recentErrors.length > 5) this.recentErrors.shift();
+        }
+        if (data && data.timing && data.timing.total_ms) {
+          this.latencies.push(data.timing.total_ms);
+        }
+        if (data && data.tool_calls) {
+          data.tool_calls.forEach(function(tc) {
+            obsTracker.toolUsage[tc.name] = (obsTracker.toolUsage[tc.name] || 0) + 1;
+          });
+        }
+        if (data && data.timing && data.timing.tool_traces) {
+          data.timing.tool_traces.forEach(function(t) {
+            obsTracker.toolLatencies.push(t.duration_ms);
+            if (!obsTracker.toolLatencyMap[t.tool]) obsTracker.toolLatencyMap[t.tool] = [];
+            obsTracker.toolLatencyMap[t.tool].push(t.duration_ms);
+          });
+        }
+        if (data && data.verification_flags && data.verification_flags.length > 0) {
+          this.safetyAlerts += data.verification_flags.length;
+        }
+        if (data && data.performance) {
+          const p = data.performance;
+          const tc = p.tool_count || 0;
+          if (tc === 1) this.perf.singleToolLatencies.push(p.latency_ms);
+          if (tc >= 3) this.perf.multiStepLatencies.push(p.latency_ms);
+          if (tc > 0) { this.perf.toolExpected++; if (p.tool_success) this.perf.toolSucceeded++; }
+          if (p.has_scope_warning) this.perf.hallucinationCount++;
+          this.perf.totalVerified++;
+          if (!p.has_scope_warning) this.perf.verificationCorrect++;
+        }
+        if (data && data.structured_result && data.structured_result.confidence_score != null) {
+          this.confidenceScores.push(data.structured_result.confidence_score);
+        }
+        // Token usage tracking
+        if (data && data.token_usage) {
+          this.totalInputTokens += data.token_usage.input_tokens || 0;
+          this.totalOutputTokens += data.token_usage.output_tokens || 0;
+          this.totalCostUsd += data.token_usage.estimated_cost_usd || 0;
+          this.cacheReadTokens += data.token_usage.cache_read_tokens || 0;
+        }
+        if (data) {
+          this.responseLog.push({
+            tool_calls: data.tool_calls || [],
+            timing: data.timing || null,
+            verification_flags: data.verification_flags || [],
+            structured_result: data.structured_result || null,
+            performance: data.performance || null,
+            query: this.lastQuery || '',
+            time: new Date().toLocaleTimeString(),
+            error: error || null
+          });
+          if (this.responseLog.length > 20) this.responseLog.shift();
+        }
+        this.debouncedSave();
+        this.render();
+      },
+      avgLatency: function() {
+        if (this.latencies.length === 0) return null;
+        const sum = this.latencies.reduce(function(a, b) { return a + b; }, 0);
+        return Math.round(sum / this.latencies.length);
+      },
+      avgToolTime: function() {
+        if (this.toolLatencies.length === 0) return null;
+        const sum = this.toolLatencies.reduce(function(a, b) { return a + b; }, 0);
+        return Math.round(sum / this.toolLatencies.length);
+      },
+      render: function() {
+        if (!this.isOpen) { this._renderPending = true; return; }
+        this._renderPending = false;
+        const fmtDur = function(ms) { if (ms == null) return '\u2014'; return ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : Math.round(ms) + 'ms'; };
+
+        document.getElementById('obs-requests').textContent = this.requests;
+        document.getElementById('obs-errors').textContent = this.errors;
+        document.getElementById('obs-safety-alerts').textContent = this.safetyAlerts;
+
+        // Avg confidence
+        const avgConfEl = document.getElementById('obs-avg-confidence');
+        if (this.confidenceScores.length > 0) {
+          const avgConf = this.confidenceScores.reduce(function(a, b) { return a + b; }, 0) / this.confidenceScores.length;
+          const confPct = Math.round(avgConf * 100);
+          avgConfEl.textContent = confPct + '%';
+          avgConfEl.className = 'obs-stat-value' + (confPct >= 70 ? '' : confPct >= 40 ? ' warn' : ' error');
+        } else { avgConfEl.textContent = '\u2014'; }
+
+        // Tool success rate
+        const toolSuccessEl = document.getElementById('obs-tool-success-rate');
+        if (this.perf.toolExpected > 0) {
+          const tsRate = Math.round((this.perf.toolSucceeded / this.perf.toolExpected) * 100);
+          toolSuccessEl.textContent = tsRate + '%';
+          toolSuccessEl.className = 'obs-stat-value' + (tsRate >= 95 ? '' : ' error');
+        } else { toolSuccessEl.textContent = '\u2014'; }
+
+        // Token usage
+        const tokenEl = document.getElementById('obs-token-usage');
+        if (this.totalInputTokens > 0 || this.totalOutputTokens > 0) {
+          tokenEl.style.display = 'block';
+          document.getElementById('obs-input-tokens').textContent = this.totalInputTokens.toLocaleString();
+          document.getElementById('obs-output-tokens').textContent = this.totalOutputTokens.toLocaleString();
+          document.getElementById('obs-cache-tokens').textContent = this.cacheReadTokens.toLocaleString();
+          document.getElementById('obs-est-cost').textContent = '$' + this.totalCostUsd.toFixed(6);
+        } else { tokenEl.style.display = 'none'; }
+
+        const avg = this.avgLatency();
+        document.getElementById('obs-avg-latency').textContent = fmtDur(avg);
+
+        const avgTool = this.avgToolTime();
+        document.getElementById('obs-avg-tool-time').textContent = fmtDur(avgTool);
+        document.getElementById('obs-total-tools').textContent = this.toolLatencies.length;
+
+        // Latency distribution (p50/p95)
+        const distEl = document.getElementById('obs-latency-dist');
+        if (this.latencies.length >= 2) {
+          const sorted = this.latencies.slice().sort(function(a, b) { return a - b; });
+          const n = sorted.length;
+          const p50 = n % 2 === 1 ? sorted[Math.floor(n / 2)] : Math.round((sorted[n / 2 - 1] + sorted[n / 2]) / 2);
+          const p95 = sorted[Math.min(Math.ceil(n * 0.95) - 1, n - 1)];
+          distEl.style.display = 'flex';
+          distEl.innerHTML = '<span>Avg: <strong>' + fmtDur(avg) + '</strong></span><span>p50: <strong>' + fmtDur(p50) + '</strong></span><span>p95: <strong>' + fmtDur(p95) + '</strong></span><span style="color:#94a3b8">(n=' + n + ')</span>';
+        } else { distEl.style.display = 'none'; }
+
+        // Last Request trace (P0)
+        const lastReqEl = document.getElementById('obs-last-request');
+        const lastLog = this.responseLog.length > 0 ? this.responseLog[this.responseLog.length - 1] : null;
+        if (lastLog) {
+          const query = (lastLog.query || '').slice(0, 60) || '(unknown query)';
+          const totalMs = lastLog.timing ? lastLog.timing.total_ms : null;
+          let toolSumMs = 0;
+          if (lastLog.timing && lastLog.timing.tool_traces) {
+            toolSumMs = lastLog.timing.tool_traces.reduce(function(s, t) { return s + t.duration_ms; }, 0);
+          }
+          const llmMs = totalMs ? Math.max(0, totalMs - toolSumMs) : null;
+          let toolPills = '';
+          if (lastLog.timing && lastLog.timing.tool_traces) {
+            lastLog.timing.tool_traces.forEach(function(t) {
+              toolPills += '<span class="obs-last-tool-pill">' + (TOOL_LABELS[t.tool] || t.tool) + ' (' + fmtDur(t.duration_ms) + ')</span>';
+            });
+          } else if (lastLog.tool_calls && lastLog.tool_calls.length > 0) {
+            lastLog.tool_calls.forEach(function(tc) {
+              toolPills += '<span class="obs-last-tool-pill">' + (TOOL_LABELS[tc.name] || tc.name) + '</span>';
+            });
+          }
+          lastReqEl.innerHTML = '<div class="obs-last-request">' +
+            '<div class="obs-last-query">"' + escapeHtml(query) + '"</div>' +
+            '<div class="obs-last-timing"><span>Total: <strong>' + fmtDur(totalMs) + '</strong></span>' +
+            '<span>LLM: <strong>' + fmtDur(llmMs) + '</strong></span>' +
+            '<span>Tools: <strong>' + fmtDur(toolSumMs) + '</strong></span></div>' +
+            (toolPills ? '<div class="obs-last-tools">' + toolPills + '</div>' : '') +
+            '</div>';
+        } else {
+          lastReqEl.innerHTML = '<div class="obs-no-data">No requests yet<div class="obs-no-data-detail">Send a message to see request traces</div></div>';
+        }
+
+        // Tool usage bars with latency (P0)
+        const usageDiv = document.getElementById('obs-tool-usage');
+        const entries = Object.entries(this.toolUsage);
+        if (entries.length === 0) {
+          usageDiv.innerHTML = '<div class="obs-no-data">No tool usage recorded yet<div class="obs-no-data-detail">Tool counts and avg latencies appear here</div></div>';
+        } else {
+          entries.sort(function(a, b) { return b[1] - a[1]; });
+          const maxCount = entries[0][1];
+          const tlm = this.toolLatencyMap;
+          let html = '';
+          entries.forEach(function(e) {
+            const toolKey = e[0];
+            const name = TOOL_LABELS[toolKey] || toolKey;
+            const count = e[1];
+            const pct = Math.round((count / maxCount) * 100);
+            let avgLat = '';
+            if (tlm[toolKey] && tlm[toolKey].length > 0) {
+              const tavg = Math.round(tlm[toolKey].reduce(function(s, v) { return s + v; }, 0) / tlm[toolKey].length);
+              avgLat = '<span class="obs-tool-latency">(' + fmtDur(tavg) + ')</span>';
+            }
+            html += '<div class="obs-tool-row">' +
+              '<span class="obs-tool-name" title="' + name + '">' + name + '</span>' +
+              '<div class="obs-tool-bar-bg"><div class="obs-tool-bar" style="width:' + pct + '%"></div></div>' +
+              '<span class="obs-tool-count">' + count + avgLat + '</span>' +
+              '</div>';
+          });
+          usageDiv.innerHTML = html;
+        }
+
+        // Request timeline (P1)
+        const timelineEl = document.getElementById('obs-timeline');
+        if (this.responseLog.length === 0) {
+          timelineEl.innerHTML = '<div class="obs-no-data">No requests yet</div>';
+        } else {
+          const recent = this.responseLog.slice(-10).reverse();
+          let thtml = '';
+          recent.forEach(function(r) {
+            const tools = r.tool_calls && r.tool_calls.length > 0
+              ? r.tool_calls.map(function(tc) { return TOOL_LABELS[tc.name] || tc.name; }).join(', ')
+              : '(no tools)';
+            const dur = r.timing ? fmtDur(r.timing.total_ms) : '\u2014';
+            const status = r.error ? '\u274C' : '\u2705';
+            const time = r.time || '';
+            thtml += '<div class="obs-timeline-entry">' +
+              '<span class="obs-timeline-time">' + time + '</span>' +
+              '<span class="obs-timeline-tools" title="' + escapeHtml(tools) + '">' + escapeHtml(tools) + '</span>' +
+              '<span class="obs-timeline-dur">' + dur + '</span>' +
+              '<span class="obs-timeline-status">' + status + '</span>' +
+              '</div>';
+          });
+          timelineEl.innerHTML = thtml;
+        }
+
+        // Error log with badge and copy
+        const errorLog = document.getElementById('obs-error-log');
+        const errorBadge = document.getElementById('obs-error-badge');
+        const copyErrorsBtn = document.getElementById('obs-copy-errors');
+        if (this.recentErrors.length > 0) {
+          errorLog.style.display = 'block';
+          errorLog.innerHTML = this.recentErrors.map(function(e) {
+            return '<div class="obs-error-entry">' + e.time + ': ' + e.msg + '</div>';
+          }).join('');
+          if (errorBadge) { errorBadge.style.display = 'inline'; errorBadge.textContent = this.recentErrors.length; }
+          if (copyErrorsBtn) copyErrorsBtn.style.display = 'inline';
+        } else {
+          errorLog.style.display = 'none';
+          if (errorBadge) errorBadge.style.display = 'none';
+          if (copyErrorsBtn) copyErrorsBtn.style.display = 'none';
+        }
+
+        // Langfuse link
+        const lfContainer = document.getElementById('obs-langfuse-container');
+        if (lastLog && lastLog.structured_result && lastLog.structured_result.trace_id) {
+          lfContainer.style.display = 'block';
+          const lfLink = document.getElementById('obs-langfuse-link');
+          lfLink.href = 'https://us.cloud.langfuse.com/trace/' + lastLog.structured_result.trace_id;
+        } else if (lfContainer) { lfContainer.style.display = 'none'; }
+
+        // Performance targets
+        this.renderPerformance();
+      },
+      renderPerformance: function() {
+        const p = this.perf;
+        let targetsMet = 0;
+        const targetsTotal = 5;
+
+        // Helper: update a target row
+        function setTarget(id, value, met) {
+          const valEl = document.getElementById('perf-val-' + id);
+          const iconEl = document.getElementById('perf-icon-' + id);
+          if (!valEl || !iconEl) return;
+          valEl.textContent = value;
+          valEl.className = 'perf-value ' + (met === null ? 'pending' : met ? 'met' : 'unmet');
+          iconEl.textContent = met === null ? '\u23F3' : met ? '\u2705' : '\u274C';
+        }
+
+        // 1. Single-tool latency <5s
+        if (p.singleToolLatencies.length > 0) {
+          const avgSingle = p.singleToolLatencies.reduce(function(a, b) { return a + b; }, 0) / p.singleToolLatencies.length;
+          const met1 = avgSingle < 5000;
+          if (met1) targetsMet++;
+          setTarget('latency1', (avgSingle / 1000).toFixed(1) + 's (n=' + p.singleToolLatencies.length + ')', met1);
+        } else {
+          setTarget('latency1', '\u2014', null);
+        }
+
+        // 2. Multi-step latency <15s
+        if (p.multiStepLatencies.length > 0) {
+          const avgMulti = p.multiStepLatencies.reduce(function(a, b) { return a + b; }, 0) / p.multiStepLatencies.length;
+          const met2 = avgMulti < 15000;
+          if (met2) targetsMet++;
+          setTarget('latency3', (avgMulti / 1000).toFixed(1) + 's (n=' + p.multiStepLatencies.length + ')', met2);
+        } else {
+          setTarget('latency3', '\u2014', null);
+        }
+
+        // 3. Tool success >95%
+        if (p.toolExpected > 0) {
+          const successRate = (p.toolSucceeded / p.toolExpected) * 100;
+          const met3 = successRate >= 95;
+          if (met3) targetsMet++;
+          setTarget('toolsuccess', successRate.toFixed(0) + '% (n=' + p.toolExpected + ')', met3);
+        } else {
+          setTarget('toolsuccess', '\u2014', null);
+        }
+
+        // 4. Hallucination <5%
+        if (this.requests > 0) {
+          const hallucRate = (p.hallucinationCount / this.requests) * 100;
+          const met4 = hallucRate < 5;
+          if (met4) targetsMet++;
+          setTarget('halluc', hallucRate.toFixed(1) + '% (n=' + this.requests + ')', met4);
+        } else {
+          setTarget('halluc', '\u2014', null);
+        }
+
+        // 5. Verification >90%
+        if (p.totalVerified > 0) {
+          const verifyRate = (p.verificationCorrect / p.totalVerified) * 100;
+          const met5 = verifyRate >= 90;
+          if (met5) targetsMet++;
+          setTarget('verify', verifyRate.toFixed(0) + '% (n=' + p.totalVerified + ')', met5);
+        } else {
+          setTarget('verify', '\u2014', null);
+        }
+
+        // Overall score
+        const scoreEl = document.getElementById('perf-score');
+        if (this.requests > 0) {
+          scoreEl.textContent = targetsMet + '/' + targetsTotal;
+          scoreEl.className = 'perf-score-value ' + (targetsMet >= 4 ? 'good' : targetsMet >= 2 ? 'ok' : 'bad');
+        } else {
+          scoreEl.textContent = '\u2014';
+          scoreEl.className = 'perf-score-value pending';
+        }
+      }
+    };
+
+    // Toggle sidebar
+    function toggleObsSidebar() {
+      document.getElementById('obs-sidebar').classList.toggle('open');
+      document.getElementById('obs-toggle').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+      obsTracker.isOpen = document.getElementById('obs-sidebar').classList.contains('open');
+      if (obsTracker.isOpen && obsTracker._renderPending) {
+        obsTracker.render();
+      }
+    }
+    document.getElementById('obs-toggle').addEventListener('click', toggleObsSidebar);
+    document.getElementById('obs-close').addEventListener('click', toggleObsSidebar);
+
+    // Obs sidebar action buttons
+    document.getElementById('obs-clear-btn').addEventListener('click', function() {
+      if (confirm('Clear all observability stats for this session?')) obsTracker.clear();
+    });
+    document.getElementById('obs-export-btn').addEventListener('click', function() {
+      obsTracker.exportJSON();
+    });
+    document.getElementById('obs-copy-session').addEventListener('click', function() {
+      const sid = document.getElementById('obs-session-id').textContent;
+      if (sid && sid !== '\u2014') {
+        navigator.clipboard.writeText(sid).then(function() {
+          const btn = document.getElementById('obs-copy-session');
+          btn.textContent = '\u2705';
+          setTimeout(function() { btn.innerHTML = '&#128203;'; }, 1500);
+        });
+      }
+    });
+    document.getElementById('obs-copy-errors').addEventListener('click', function() {
+      const errText = obsTracker.recentErrors.map(function(e) { return e.time + ': ' + e.msg; }).join('\n');
+      if (errText) {
+        navigator.clipboard.writeText(errText).then(function() {
+          const btn = document.getElementById('obs-copy-errors');
+          btn.textContent = '\u2705 Copied';
+          setTimeout(function() { btn.textContent = 'Copy errors'; }, 1500);
+        });
+      }
+    });
+
+    // Flush debounced save on page unload to prevent data loss
+    window.addEventListener('beforeunload', function() { obsTracker.save(); });
+
+    const chatContainer = document.getElementById('chat-container');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const patientSelect = document.getElementById('patient-select');
+    let messageIndex = 0;
+
+    // Patient metadata (mirrors src/ui-helpers.ts for TDD)
+    const PATIENT_INFO = {
+      '1': { name: 'John Demo', detail: 'DOB: 03/15/1958 | Male | Conditions: AFib, HTN, T2DM, Hyperlipidemia, GERD' },
+      '2': { name: 'Jane Minimal', detail: 'DOB: 07/22/1985 | Female | No active conditions' },
+      '3': { name: 'Bob Allergic', detail: 'DOB: 11/03/1972 | Male | Conditions: HTN | Multiple drug allergies' },
+      '4': { name: 'Sara Complex', detail: 'DOB: 05/28/1945 | Female | Multi-morbidity: AFib, HTN, T2DM, CKD' },
+    };
+
+    function showPatientRequired() {
+      const warn = document.getElementById('patient-warning');
+      warn.style.display = 'block';
+      patientSelect.classList.add('patient-required');
+      setTimeout(function() {
+        warn.style.display = 'none';
+        patientSelect.classList.remove('patient-required');
+      }, 3000);
+    }
+
+    function updatePatientContext() {
+      const pid = patientSelect.value;
+      const ctx = document.getElementById('patient-context');
+      const quickBtns = document.querySelectorAll('.quick-btn');
+      if (pid && PATIENT_INFO[pid]) {
+        ctx.style.display = 'block';
+        document.getElementById('patient-context-name').textContent =
+          'Viewing: ' + PATIENT_INFO[pid].name + ' (ID: ' + pid + ')';
+        document.getElementById('patient-context-detail').textContent = PATIENT_INFO[pid].detail;
+        quickBtns.forEach(function(b) { b.classList.remove('disabled'); });
+        document.getElementById('patient-warning').style.display = 'none';
+      } else {
+        ctx.style.display = 'none';
+        quickBtns.forEach(function(b) { b.classList.add('disabled'); });
+      }
+    }
+
+    // Lock/unlock the patient dropdown — one patient per chat session
+    function lockPatientDropdown() {
+      patientSelect.classList.add('locked');
+      patientSelect.disabled = true;
+      let hint = document.getElementById('patient-lock-hint');
+      if (!hint) {
+        hint = document.createElement('span');
+        hint.id = 'patient-lock-hint';
+        hint.className = 'patient-lock-hint';
+        hint.textContent = '(locked)';
+        hint.title = 'Patient is locked for this chat. Click New Chat to switch patients.';
+        patientSelect.parentElement.appendChild(hint);
+      }
+      hint.style.display = 'inline';
+    }
+    function unlockPatientDropdown() {
+      patientSelect.classList.remove('locked');
+      patientSelect.disabled = false;
+      const hint = document.getElementById('patient-lock-hint');
+      if (hint) hint.style.display = 'none';
+    }
+
+    patientSelect.addEventListener('change', function() {
+      // If chat has messages, block the change and show switch prompt
+      const userMsgCount = chatContainer.querySelectorAll('.message.user').length;
+      if (userMsgCount > 0 && patientIdForThisChat && patientSelect.value !== patientIdForThisChat) {
+        const newPid = patientSelect.value;
+        const newName = PATIENT_INFO[newPid]?.name || 'selected patient';
+        const prevName = PATIENT_INFO[patientIdForThisChat]?.name || 'current patient';
+        // Revert the dropdown
+        patientSelect.value = patientIdForThisChat;
+        // Show the switch prompt in chat
+        const oldNotice = document.querySelector('.patient-switch-notice');
+        if (oldNotice) oldNotice.remove();
+        const notice = document.createElement('div');
+        notice.className = 'patient-switch-notice';
+        // Check if there's a previous chat for the new patient
+        const prevChat = getChatIndex().find(function(e) { return e.patient_id === newPid && e.id !== sessionId; });
+        const resumeBtn = prevChat
+          ? '<button class="patient-switch-btn secondary" data-action="resume">Resume chat: "' + escapeHtml(prevChat.title.slice(0, 30)) + '"</button>'
+          : '';
+        notice.innerHTML = '<div>\u2139\uFE0F This chat is for <strong>' + escapeHtml(prevName) +
+          '</strong>. To query <strong>' + escapeHtml(newName) +
+          '</strong>, start a new chat to keep patient data separate.</div>' +
+          '<div class="patient-switch-actions">' +
+          '<button class="patient-switch-btn primary" data-action="new-chat">New Chat for ' + escapeHtml(newName) + '</button>' +
+          resumeBtn +
+          '<button class="patient-switch-btn secondary" data-action="dismiss">Stay with ' + escapeHtml(prevName) + '</button>' +
+          '</div>';
+        chatContainer.appendChild(notice);
+        scrollToBottom();
+        notice.querySelector('[data-action="new-chat"]').addEventListener('click', function() {
+          notice.remove();
+          saveChatToHistory();
+          try {
+            localStorage.setItem(PATIENT_ID_KEY, newPid);
+            localStorage.removeItem(SESSION_KEY);
+          } catch (e) {}
+          window.location.reload();
+        });
+        if (prevChat) {
+          notice.querySelector('[data-action="resume"]').addEventListener('click', function() {
+            notice.remove();
+            saveChatToHistory();
+            loadChatFromHistory(prevChat.id);
+          });
+        }
+        notice.querySelector('[data-action="dismiss"]').addEventListener('click', function() {
+          notice.remove();
+        });
+        return;
+      }
+      updatePatientContext();
+    });
+
+    (function initFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get('pid');
+      if (pid && patientSelect.querySelector('option[value="' + pid + '"]')) {
+        patientSelect.value = pid;
+      }
+      updatePatientContext();
+    })();
+
+    const TOOL_ICONS = {
+      get_patient_summary: '\u{1F464}',
+      get_medications: '\u{1F48A}',
+      drug_interaction_check: '\u26A0\uFE0F',
+      allergy_check: '\u{1F9EA}',
+      get_lab_results: '\u{1F9EC}',
+      get_encounter_data: '\u{1F3E5}',
+      reconcile_medications: '\u{1F4CB}',
+      draft_discharge_summary: '\u{1F4DD}',
+      generate_discharge_instructions: '\u{1F4C4}',
+      save_to_chart: '\u{1F4BE}'
+    };
+    const TOOL_LABELS = {
+      get_patient_summary: 'Patient Summary',
+      get_medications: 'Medications',
+      drug_interaction_check: 'Drug Interactions',
+      allergy_check: 'Allergy Check',
+      get_lab_results: 'Lab Results',
+      get_encounter_data: 'Encounter Data',
+      reconcile_medications: 'Med Reconciliation',
+      draft_discharge_summary: 'Discharge Summary',
+      generate_discharge_instructions: 'Discharge Instructions',
+      save_to_chart: 'Save to Chart'
+    };
+
+    // Restore observability data from localStorage (after TOOL_LABELS is defined)
+    obsTracker.load();
+
+    // SEC-004: escapeHtml — string-based, mirrors src/ui-helpers.ts for TDD
+    function escapeHtml(s) {
+      return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Lightweight inline markdown renderer (mirrors src/ui-helpers.ts).
+     * Escapes HTML first (XSS-safe), then applies markdown transforms.
+     */
+    function renderMarkdown(text) {
+      const html = escapeHtml(text);
+      const lines = html.split('\n');
+      const blocks = [];
+      let currentList = null;
+
+      function flushList() {
+        if (currentList) {
+          const tag = currentList.type;
+          const inner = currentList.items.map(function(item) { return '<li>' + item + '</li>'; }).join('');
+          blocks.push('<' + tag + '>' + inner + '</' + tag + '>');
+          currentList = null;
+        }
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Horizontal rule
+        if (/^-{3,}$/.test(line.trim())) { flushList(); blocks.push('<hr>'); continue; }
+
+        // Headings
+        const h3Match = line.match(/^###\s+(.+)$/);
+        if (h3Match) { flushList(); blocks.push('<h4 class="md-h4">' + h3Match[1] + '</h4>'); continue; }
+        const h2Match = line.match(/^##\s+(.+)$/);
+        if (h2Match) { flushList(); blocks.push('<h3 class="md-h3">' + h2Match[1] + '</h3>'); continue; }
+        const h1Match = line.match(/^#\s+(.+)$/);
+        if (h1Match) { flushList(); blocks.push('<h2 class="md-h2">' + h1Match[1] + '</h2>'); continue; }
+
+        // Unordered list
+        const ulMatch = line.match(/^[-*]\s+(.+)$/);
+        if (ulMatch) {
+          if (currentList && currentList.type !== 'ul') flushList();
+          if (!currentList) currentList = { type: 'ul', items: [] };
+          currentList.items.push(ulMatch[1]);
+          continue;
+        }
+
+        // Ordered list
+        const olMatch = line.match(/^\d+\.\s+(.+)$/);
+        if (olMatch) {
+          if (currentList && currentList.type !== 'ol') flushList();
+          if (!currentList) currentList = { type: 'ol', items: [] };
+          currentList.items.push(olMatch[1]);
+          continue;
+        }
+
+        flushList();
+        if (line.trim() === '') { blocks.push('__PARA_BREAK__'); continue; }
+        blocks.push(line);
+      }
+      flushList();
+
+      // Group text lines into paragraphs
+      const output = [];
+      let paraLines = [];
+      function flushPara() {
+        if (paraLines.length > 0) {
+          output.push('<p class="md-p">' + paraLines.join('<br>') + '</p>');
+          paraLines = [];
+        }
+      }
+      for (let j = 0; j < blocks.length; j++) {
+        const block = blocks[j];
+        if (block === '__PARA_BREAK__') { flushPara(); }
+        else if (block.charAt(0) === '<' && /^<(h[2-4]|ul|ol|hr)/.test(block)) { flushPara(); output.push(block); }
+        else { paraLines.push(block); }
+      }
+      flushPara();
+
+      let result = output.join('');
+      // Bold: **text**
+      result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Italic: *text* (not inside bold)
+      result = result.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+      return result;
+    }
+
+    /** Format ms duration: <1ms → "<1ms", <1000ms → "42ms", ≥1s → "1.2s" */
+    function formatDuration(ms) {
+      if (ms < 1) return '<1ms';
+      if (ms < 1000) return Math.round(ms) + 'ms';
+      return (ms / 1000).toFixed(1) + 's';
+    }
+
+    /** Format confidence score (0-1) as percentage with color class */
+    function formatConfidence(score) {
+      if (score == null) return null;
+      const pct = Math.round(score * 100);
+      const cls = pct >= 70 ? 'high' : pct >= 40 ? 'med' : 'low';
+      return { pct: pct, cls: cls };
+    }
+
+    function addMessage(role, content, toolCalls, safetyAlerts, timing, structuredResult, reasoningSteps) {
+      const welcome = document.querySelector('.welcome');
+      if (welcome) welcome.remove();
+
+      const idx = messageIndex++;
+      const div = document.createElement('div');
+      div.className = 'message ' + (role === 'user' ? 'user' : 'agent');
+      div.dataset.index = idx;
+
+      let html = '<div class="message-bubble">';
+
+      if (safetyAlerts && safetyAlerts.length > 0) {
+        html += safetyAlerts.map(a => {
+          const cls = a.includes('CRITICAL') ? 'safety-alert critical' : 'safety-alert';
+          return '<div class="' + cls + '">' + escapeHtml(a) + '</div>';
+        }).join('');
+      }
+
+      // User messages: plain escaped text; Agent messages: rendered markdown
+      if (role === 'user') {
+        html += '<div class="message-content">' + escapeHtml(content) + '</div>';
+      } else {
+        html += '<div class="message-content md-rendered">' + renderMarkdown(content) + '</div>';
+      }
+
+      if (toolCalls && toolCalls.length > 0) {
+        // Build a map of tool name → duration from traces
+        const traceMap = {};
+        if (timing && timing.tool_traces) {
+          timing.tool_traces.forEach(function(t) { traceMap[t.tool] = t.duration_ms; });
+        }
+        html += '<div class="tool-badges">';
+        toolCalls.forEach(tc => {
+          const icon = TOOL_ICONS[tc.name] || '\u{1F527}';
+          const label = TOOL_LABELS[tc.name] || tc.name;
+          const ms = traceMap[tc.name];
+          const latency = ms != null ? ' (' + formatDuration(ms) + ')' : '';
+          html += '<span class="tool-badge"><span class="icon">' + icon + '</span> ' + escapeHtml(label) + escapeHtml(latency) + '</span>';
+        });
+        html += '</div>';
+        html += '<div class="tool-detail" onclick="this.classList.toggle(\'open\')">';
+        html += '<span>View execution trace</span>';
+        html += '<div class="tool-detail-content">';
+        // Show LLM reasoning steps (input → reasoning → tool calls → output)
+        if (reasoningSteps && reasoningSteps.length > 0) {
+          html += '<div style="margin-bottom:8px;"><strong>Agent Reasoning:</strong></div>';
+          reasoningSteps.forEach(function(step, i) {
+            html += '<div style="margin-bottom:6px;padding:6px 8px;background:rgba(37,99,235,0.06);border-left:3px solid #2563eb;border-radius:0 4px 4px 0;font-size:0.8rem;color:#334155;">';
+            html += '<span style="font-weight:600;color:#2563eb;">Step ' + (i + 1) + ':</span> ' + escapeHtml(step);
+            html += '</div>';
+          });
+          html += '<hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0;">';
+        }
+        // Show full breakdown: LLM inference + per-tool, so durations add up to total
+        if (timing && timing.tool_traces && timing.tool_traces.length > 0) {
+          const toolSum = timing.tool_traces.reduce(function(s, t) { return s + t.duration_ms; }, 0);
+          const llmMs = timing.total_ms ? Math.max(0, timing.total_ms - toolSum) : 0;
+          const traceLines = [];
+          let stepNum = 1;
+          traceLines.push({ step: stepNum++, component: 'LLM Inference (Claude)', duration_ms: llmMs, display: formatDuration(llmMs) });
+          timing.tool_traces.forEach(function(t) {
+            traceLines.push({ step: stepNum++, component: t.tool, duration_ms: t.duration_ms, display: formatDuration(t.duration_ms) });
+          });
+          traceLines.push({ total_ms: timing.total_ms || 0, display: formatDuration(timing.total_ms || 0) });
+          html += escapeHtml(JSON.stringify(traceLines, null, 2));
+        } else {
+          html += escapeHtml(JSON.stringify(toolCalls.map(tc => ({
+            tool: tc.name,
+            args: tc.args,
+          })), null, 2));
+        }
+        html += '</div></div>';
+      }
+
+      // Structured result card (readable format instead of raw JSON)
+      if (structuredResult) {
+        html += '<div class="sr-card">';
+        // Confidence bar
+        const conf = formatConfidence(structuredResult.confidence_score);
+        if (conf) {
+          html += '<div class="sr-confidence-row">';
+          html += '<span class="sr-confidence-label">Confidence</span>';
+          html += '<div class="sr-confidence-bar"><div class="sr-confidence-fill sr-conf-' + conf.cls + '" style="width:' + conf.pct + '%"><span class="sr-conf-inner">\u{1F3AF} ' + conf.pct + '%</span></div></div>';
+          html += '</div>';
+        }
+        // Verification checks grid
+        // Healthy responses omit .verification and put has_sources/data_sources at top level.
+        // Unhealthy responses nest everything under .verification.
+        const v = structuredResult.verification || {};
+        const vc = v.verification_checks || {};
+        const isHealthy = !structuredResult.verification && structuredResult.has_sources !== undefined;
+        const srcVerified = isHealthy ? structuredResult.has_sources : v.has_sources;
+        const noHallucination = isHealthy ? true : !!vc.hallucination_detection;
+        const domainSafe = isHealthy ? true : !!vc.domain_constraints;
+        const outputValid = isHealthy ? true : !!v.output_valid;
+        html += '<div class="sr-checks-grid">';
+        html += '<div class="sr-check">' + (srcVerified ? '\u2705' : '\u274C') + ' Sources Verified</div>';
+        html += '<div class="sr-check">' + (noHallucination ? '\u2705 No Hallucination' : '\u26A0\uFE0F Hallucination Risk') + '</div>';
+        html += '<div class="sr-check">' + (domainSafe ? '\u2705' : '\u274C') + ' Domain Safe</div>';
+        html += '<div class="sr-check">' + (outputValid ? '\u2705' : '\u274C') + ' Output Valid</div>';
+        html += '</div>';
+        // Source tags — use data_sources for healthy, verification.sources for unhealthy
+        const displaySources = isHealthy ? (structuredResult.data_sources || []) : (v.sources || []);
+        if (displaySources.length > 0) {
+          html += '<div class="sr-sources">';
+          displaySources.forEach(function(src) {
+            html += '<span class="sr-source-pill">' + escapeHtml(src) + '</span>';
+          });
+          html += '</div>';
+        }
+        // Escalation warning
+        if (v.needs_escalation) {
+          html += '<div class="sr-escalation">\u26A0\uFE0F <strong>Escalation Required</strong> — This response may need clinician review before acting on it.</div>';
+        }
+        // Collapsible raw JSON for debugging
+        html += '<div class="sr-raw-toggle" onclick="this.classList.toggle(\'open\'); event.stopPropagation();">';
+        html += '<span>\u25B6 View Raw Data</span>';
+        html += '<div class="sr-raw-content">' + escapeHtml(JSON.stringify(structuredResult, null, 2)) + '</div>';
+        html += '</div>';
+        html += '</div>';
+      }
+
+      // Timing display — full breakdown so durations add up
+      if (timing && timing.total_ms) {
+        const totalMs = timing.total_ms;
+        const toolCount = timing.tool_count || 0;
+        let toolSumMs = 0;
+        if (timing.tool_traces) {
+          toolSumMs = timing.tool_traces.reduce(function(s, t) { return s + t.duration_ms; }, 0);
+        }
+        const llmInferenceMs = Math.max(0, totalMs - toolSumMs);
+        html += '<div class="message-timing">';
+        html += '\u23F1 ' + formatDuration(totalMs);
+        if (toolCount > 0) {
+          html += ' \u00B7 LLM: ' + formatDuration(llmInferenceMs) + ' + Tools: ' + formatDuration(toolSumMs);
+        }
+        // Confidence pill in timing row
+        if (structuredResult && structuredResult.confidence_score != null) {
+          const cInfo = formatConfidence(structuredResult.confidence_score);
+          if (cInfo) {
+            html += '<span class="confidence-pill ' + cInfo.cls + '">\u{1F3AF} ' + cInfo.pct + '%</span>';
+          }
+        }
+        html += '</div>';
+      }
+
+      // Edit + Finalize buttons when save_to_chart tool was used
+      if (toolCalls && toolCalls.length > 0) {
+        const saveCall = toolCalls.find(tc => tc.name === 'save_to_chart');
+        if (saveCall) {
+          const docIdMatch = content.match(/Document ID:\s*(doc-\w+)/i) || content.match(/(doc-\d+)/);
+          const docId = docIdMatch ? docIdMatch[1] : null;
+          if (docId) {
+            html += '<div class="doc-actions" data-doc-id="' + escapeHtml(docId) + '">';
+            html += '<button class="edit-btn" onclick="editDraft(this, \'' + escapeHtml(docId) + '\')">';
+            html += '\u270F\uFE0F Edit Draft</button>';
+            html += '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">';
+            html += '\u2705 Finalize &amp; Save to Chart</button>';
+            html += '</div>';
+          }
+        }
+      }
+
+      if (role !== 'user') {
+        html += '<div class="feedback-row">';
+        html += '<button data-fb="up" title="Helpful" aria-label="Helpful" onclick="sendFeedback(' + idx + ', \'up\', this)">&#x1F44D;</button>';
+        html += '<button data-fb="down" title="Not helpful" aria-label="Not helpful" onclick="sendFeedback(' + idx + ', \'down\', this)">&#x1F44E;</button>';
+        html += '<button class="copy-btn" title="Copy response" aria-label="Copy response" onclick="copyMessage(this)">&#x1F4CB; Copy</button>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+      div.innerHTML = html;
+      chatContainer.appendChild(div);
+      scrollToBottom();
+    }
+
+    function sendFeedback(msgIdx, rating, btn) {
+      const row = btn.parentElement;
+      row.querySelectorAll('button[data-fb]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, message_index: msgIdx, rating })
+      }).catch(() => {});
+      showToast('Thanks for your feedback!');
+    }
+
+    function copyMessage(btn) {
+      const bubble = btn.closest('.message-bubble');
+      const content = bubble ? bubble.querySelector('.message-content') : null;
+      if (!content) return;
+      const text = content.innerText || content.textContent || '';
+      navigator.clipboard.writeText(text).then(function() {
+        btn.innerHTML = '&#x2705; Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.innerHTML = '&#x1F4CB; Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(function() {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.innerHTML = '&#x2705; Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.innerHTML = '&#x1F4CB; Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    function showToast(message) {
+      let toast = document.getElementById('feedback-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'feedback-toast';
+        toast.className = 'feedback-toast';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(function() { toast.classList.remove('show'); }, 2000);
+    }
+
+    async function editDraft(btn, docId) {
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      try {
+        const res = await fetch('/api/documents/' + encodeURIComponent(docId));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load document');
+
+        const bubble = btn.closest('.message-bubble');
+        const contentDiv = bubble.querySelector('.message-content');
+        const actionsDiv = bubble.querySelector('.doc-actions');
+
+        // Hide original content, show textarea
+        contentDiv.style.display = 'none';
+        const textarea = document.createElement('textarea');
+        textarea.className = 'draft-editor';
+        textarea.value = data.content;
+        textarea.dataset.docId = docId;
+        contentDiv.after(textarea);
+        textarea.focus();
+
+        // Replace buttons with Save/Cancel
+        actionsDiv.innerHTML =
+          '<button class="save-edit-btn" onclick="saveDraftEdit(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u{1F4BE} Save Edit</button>' +
+          '<button class="cancel-edit-btn" onclick="cancelDraftEdit(this, \'' + escapeHtml(docId) + '\')">' +
+          'Cancel</button>' +
+          '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u2705 Finalize &amp; Save to Chart</button>';
+      } catch (err) {
+        btn.textContent = '\u274C ' + (err.message || 'Load failed');
+        btn.disabled = false;
+      }
+    }
+
+    async function saveDraftEdit(btn, docId) {
+      const bubble = btn.closest('.message-bubble');
+      const textarea = bubble.querySelector('.draft-editor');
+      const newContent = textarea.value;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      try {
+        const res = await fetch('/api/documents/' + encodeURIComponent(docId), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: newContent })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+
+        // Update display with edited content
+        const contentDiv = bubble.querySelector('.message-content');
+        contentDiv.textContent = newContent;
+        contentDiv.style.display = '';
+        textarea.remove();
+
+        // Restore Edit + Finalize buttons
+        const actionsDiv = bubble.querySelector('.doc-actions');
+        actionsDiv.innerHTML =
+          '<button class="edit-btn" onclick="editDraft(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u270F\uFE0F Edit Draft</button>' +
+          '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">' +
+          '\u2705 Finalize &amp; Save to Chart</button>';
+      } catch (err) {
+        btn.textContent = '\u274C ' + (err.message || 'Save failed');
+        btn.disabled = false;
+      }
+    }
+
+    function cancelDraftEdit(btn, docId) {
+      const bubble = btn.closest('.message-bubble');
+      const textarea = bubble.querySelector('.draft-editor');
+      const contentDiv = bubble.querySelector('.message-content');
+
+      contentDiv.style.display = '';
+      textarea.remove();
+
+      // Restore Edit + Finalize buttons
+      const actionsDiv = bubble.querySelector('.doc-actions');
+      actionsDiv.innerHTML =
+        '<button class="edit-btn" onclick="editDraft(this, \'' + escapeHtml(docId) + '\')">' +
+        '\u270F\uFE0F Edit Draft</button>' +
+        '<button class="finalize-btn" onclick="finalizeDocument(this, \'' + escapeHtml(docId) + '\')">' +
+        '\u2705 Finalize &amp; Save to Chart</button>';
+    }
+
+    async function finalizeDocument(btn, docId) {
+      btn.disabled = true;
+      btn.textContent = 'Finalizing...';
+      try {
+        const bubble = btn.closest('.message-bubble');
+        const textarea = bubble ? bubble.querySelector('.draft-editor') : null;
+        const body = {};
+        if (textarea) {
+          body.content = textarea.value;
+        }
+        const res = await fetch('/api/documents/' + encodeURIComponent(docId) + '/finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Finalize failed');
+
+        // Clean up editor if present
+        if (textarea) {
+          const contentDiv = bubble.querySelector('.message-content');
+          contentDiv.textContent = textarea.value;
+          contentDiv.style.display = '';
+          textarea.remove();
+        }
+
+        // Disable all buttons
+        const actionsDiv = btn.closest('.doc-actions');
+        if (actionsDiv) {
+          actionsDiv.innerHTML = '<span class="finalize-btn finalized">\u2705 Finalized — Saved to Chart</span>';
+        } else {
+          btn.textContent = '\u2705 Finalized — Saved to Chart';
+          btn.classList.add('finalized');
+        }
+      } catch (err) {
+        btn.textContent = '\u274C Finalize failed — ' + (err.message || 'Try again');
+        btn.disabled = false;
+      }
+    }
+
+    function setThinking(on) {
+      let el = document.getElementById('thinking');
+      if (on) {
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'thinking';
+          el.className = 'message agent';
+          el.innerHTML = '<div class="message-bubble"><div class="thinking-indicator">' +
+            '<div class="dot-pulse"><span></span><span></span><span></span></div>' +
+            '<span>Analyzing...</span></div></div>';
+          chatContainer.appendChild(el);
+        }
+        el.style.display = 'flex';
+        scrollToBottom();
+      } else if (el) {
+        el.remove();
+      }
+    }
+
+    async function send(overrideMsg) {
+      const msg = (overrideMsg || messageInput.value).trim();
+      if (!msg) return;
+      // Require patient selection — dropdown is the single source of truth for patient context
+      if (!patientSelect.value) {
+        showPatientRequired();
+        return;
+      }
+      messageInput.value = '';
+      messageInput.style.height = 'auto';
+      addMessage('user', msg);
+      patientIdForThisChat = patientSelect.value;
+      lockPatientDropdown();
+      sendBtn.disabled = true;
+      messageInput.disabled = true;
+      setThinking(true);
+      try {
+        const patientId = patientIdForThisChat || patientSelect.value || null;
+        obsTracker.lastQuery = msg;
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: msg,
+            session_id: sessionId,
+            patient_id: patientId
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        setThinking(false);
+        addMessage('assistant', data.response, data.tool_calls, data.verification_flags, data.timing, data.structured_result, data.reasoning_steps);
+        obsTracker.record(data, null);
+      } catch (err) {
+        setThinking(false);
+        addMessage('assistant', 'Error: ' + (err.message || 'Something went wrong.'));
+        obsTracker.record(null, err.message || 'Unknown error');
+      }
+      sendBtn.disabled = false;
+      messageInput.disabled = false;
+      messageInput.focus();
+    }
+
+    // --- SSE streaming helpers ---
+
+    function parseSSEBuffer(buffer) {
+      var parsed = [];
+      var remaining = '';
+      var currentEvent = null;
+      var currentData = '';
+      var lines = buffer.split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          currentData = line.slice(6);
+        } else if (line === '') {
+          if (currentEvent && currentData) {
+            try { parsed.push({ event: currentEvent, data: JSON.parse(currentData) }); }
+            catch (e) { /* skip malformed */ }
+          }
+          currentEvent = null;
+          currentData = '';
+        }
+      }
+      // Incomplete event stays in buffer
+      if (currentEvent || currentData) {
+        if (currentEvent) remaining += 'event: ' + currentEvent + '\n';
+        if (currentData) remaining += 'data: ' + currentData + '\n';
+      }
+      return { parsed: parsed, remaining: remaining };
+    }
+
+    function createStreamingPlaceholder() {
+      var welcome = document.querySelector('.welcome');
+      if (welcome) welcome.remove();
+      var div = document.createElement('div');
+      div.className = 'message agent streaming';
+      div.innerHTML =
+        '<div class="message-bubble">' +
+        '<div class="message-content md-rendered streaming-cursor"></div>' +
+        '<div class="tool-badges streaming-tools" style="display:none"></div>' +
+        '</div>';
+      chatContainer.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    function addStreamingToolBadge(placeholder, toolName) {
+      var container = placeholder.querySelector('.streaming-tools');
+      container.style.display = 'flex';
+      var icon = TOOL_ICONS[toolName] || '\u{1F527}';
+      var label = TOOL_LABELS[toolName] || toolName;
+      var badge = document.createElement('span');
+      badge.className = 'tool-badge streaming-badge';
+      badge.dataset.tool = toolName;
+      badge.innerHTML = '<span class="icon">' + icon + '</span> ' + escapeHtml(label) + ' <span class="tool-status">\u23F3</span>';
+      container.appendChild(badge);
+    }
+
+    function updateStreamingToolBadge(placeholder, toolName, durationMs) {
+      var badge = placeholder.querySelector('.tool-badge[data-tool="' + toolName + '"]');
+      if (badge) {
+        var statusEl = badge.querySelector('.tool-status');
+        if (statusEl) statusEl.textContent = '(' + formatDuration(durationMs) + ')';
+        badge.classList.remove('streaming-badge');
+      }
+    }
+
+    async function sendStream(overrideMsg) {
+      var msg = (overrideMsg || messageInput.value).trim();
+      if (!msg) return;
+      if (!patientSelect.value) { showPatientRequired(); return; }
+      messageInput.value = '';
+      messageInput.style.height = 'auto';
+      addMessage('user', msg);
+      patientIdForThisChat = patientSelect.value;
+      lockPatientDropdown();
+      sendBtn.disabled = true;
+      messageInput.disabled = true;
+
+      var placeholder = createStreamingPlaceholder();
+      var contentEl = placeholder.querySelector('.message-content');
+      var accumulatedText = '';
+
+      var patientId = patientIdForThisChat || patientSelect.value || null;
+      obsTracker.lastQuery = msg;
+
+      try {
+        var res = await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: msg,
+            session_id: sessionId,
+            patient_id: patientId,
+          }),
+        });
+
+        if (!res.ok) {
+          var errData = await res.json();
+          throw new Error(errData.error || 'Request failed');
+        }
+
+        var reader = res.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        var gotDone = false;
+
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+
+          var result = parseSSEBuffer(buffer);
+          buffer = result.remaining;
+
+          for (var j = 0; j < result.parsed.length; j++) {
+            var evt = result.parsed[j];
+            switch (evt.event) {
+              case 'token':
+                accumulatedText += evt.data.content;
+                contentEl.innerHTML = renderMarkdown(accumulatedText);
+                contentEl.classList.add('md-rendered');
+                scrollToBottom();
+                break;
+              case 'tool_start':
+                addStreamingToolBadge(placeholder, evt.data.tool);
+                break;
+              case 'tool_end':
+                updateStreamingToolBadge(placeholder, evt.data.tool, evt.data.duration_ms);
+                break;
+              case 'done':
+                gotDone = true;
+                // Replace placeholder with full verified message
+                placeholder.remove();
+                addMessage('assistant', evt.data.response, evt.data.tool_calls, evt.data.verification_flags, evt.data.timing, evt.data.structured_result, evt.data.reasoning_steps);
+                obsTracker.record(evt.data, null);
+                break;
+              case 'error':
+                placeholder.remove();
+                addMessage('assistant', 'Error: ' + (evt.data.message || 'Something went wrong.'));
+                obsTracker.record(null, evt.data.message || 'Unknown error');
+                gotDone = true;
+                break;
+            }
+          }
+        }
+        // If stream ended without done/error, clean up placeholder
+        if (!gotDone && placeholder.parentElement) {
+          placeholder.remove();
+          if (accumulatedText) {
+            addMessage('assistant', accumulatedText);
+          } else {
+            addMessage('assistant', 'Error: Stream ended unexpectedly.');
+          }
+        }
+      } catch (err) {
+        if (placeholder.parentElement) placeholder.remove();
+        addMessage('assistant', 'Error: ' + (err.message || 'Something went wrong.'));
+        obsTracker.record(null, err.message || 'Unknown error');
+      }
+      sendBtn.disabled = false;
+      messageInput.disabled = false;
+      messageInput.focus();
+    }
+
+    sendBtn.addEventListener('click', () => sendStream());
+    messageInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendStream(); }
+    });
+    // Auto-resize textarea as user types
+    messageInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+    });
+
+    document.querySelectorAll('.quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pid = patientSelect.value;
+        if (!pid) {
+          showPatientRequired();
+          return;
+        }
+        const prompt = btn.dataset.prompt.replace('{pid}', pid);
+        sendStream(prompt);
+      });
+    });
+
+    /** Scroll chat container to very bottom — called after any content change */
+    function scrollToBottom() {
+      requestAnimationFrame(function() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      });
+    }
+
+    // Restore conversation history on page load with persisted trace data
+    async function restoreHistory() {
+      try {
+        const res = await fetch('/api/history/' + encodeURIComponent(sessionId));
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.messages && data.messages.length > 0) {
+          chatContainer.innerHTML = '';
+          let assistantIdx = 0;
+          for (const msg of data.messages) {
+            if (msg.role === 'assistant') {
+              const meta = obsTracker.responseLog[assistantIdx] || null;
+              if (meta) {
+                addMessage(msg.role, msg.content, meta.tool_calls, meta.verification_flags, meta.timing, meta.structured_result);
+              } else {
+                addMessage(msg.role, msg.content);
+              }
+              assistantIdx++;
+            } else {
+              addMessage(msg.role, msg.content);
+            }
+          }
+          // Ensure scroll to bottom after all messages restored
+          scrollToBottom();
+          // This chat has messages — set patient context from index or current selection
+          const entry = getChatIndex().find(function(e) { return e.id === sessionId; });
+          patientIdForThisChat = (entry && entry.patient_id) ? entry.patient_id : (patientSelect.value || null);
+          if (patientIdForThisChat) lockPatientDropdown();
+        }
+      } catch { /* ignore — fresh session */ }
+    }
+    restoreHistory().then(function() {
+      // If user chose "Start new chat" from a different-patient warning, send the pending message
+      try {
+        const raw = localStorage.getItem(PENDING_SEND_KEY);
+        if (raw) {
+          localStorage.removeItem(PENDING_SEND_KEY);
+          const pending = JSON.parse(raw);
+          if (pending.message && pending.patient_id) {
+            patientSelect.value = pending.patient_id;
+            try { localStorage.setItem(PATIENT_ID_KEY, pending.patient_id); } catch (_) {}
+            patientSelect.dispatchEvent(new Event('change'));
+            patientIdForThisChat = pending.patient_id;
+            lockPatientDropdown();
+            send(pending.message);
+          }
+        }
+      } catch { /* ignore */ }
+    });
+
+    // Display session ID in observability sidebar (truncated for readability)
+    document.getElementById('obs-session-id').textContent = sessionId.length > 16 ? sessionId.slice(0, 16) + '...' : sessionId;
+    document.getElementById('obs-session-id').title = sessionId;
+
+    // --- Chat History Sidebar ---
+    const CHAT_INDEX_KEY = 'agentforge_chat_index';
+    const PATIENT_ID_KEY = 'agentforge_patient_id';
+    const MAX_SAVED_CHATS = 20;
+
+    function getChatIndex() {
+      try {
+        const raw = localStorage.getItem(CHAT_INDEX_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    }
+
+    function saveChatIndex(index) {
+      try {
+        // Trim to max and save
+        const trimmed = index.slice(0, MAX_SAVED_CHATS);
+        localStorage.setItem(CHAT_INDEX_KEY, JSON.stringify(trimmed));
+      } catch { /* storage full */ }
+    }
+
+    function saveChatToHistory() {
+      // Extract messages from DOM
+      const msgs = [];
+      chatContainer.querySelectorAll('.message').forEach(function(el) {
+        const content = el.querySelector('.message-content');
+        if (!content) return;
+        const role = el.classList.contains('user') ? 'user' : 'assistant';
+        msgs.push({ role: role, content: content.textContent || '' });
+      });
+      if (msgs.length === 0) return; // Nothing to save
+
+      // Save messages for this session
+      const chatKey = 'agentforge_chat_' + sessionId;
+      try {
+        localStorage.setItem(chatKey, JSON.stringify(msgs));
+      } catch { /* storage full */ }
+
+      // Update index
+      const index = getChatIndex();
+      // Remove existing entry for this session if present
+      const filtered = index.filter(function(e) { return e.id !== sessionId; });
+      const pid = patientSelect.value || '';
+      const firstMsg = msgs.find(function(m) { return m.role === 'user'; });
+      const title = firstMsg ? firstMsg.content.slice(0, 50) : 'Empty chat';
+      filtered.unshift({
+        id: sessionId,
+        patient_id: pid,
+        patient_name: PATIENT_INFO[pid] ? PATIENT_INFO[pid].name : 'No Patient',
+        title: title,
+        created_at: new Date().toISOString(),
+        message_count: msgs.length
+      });
+      saveChatIndex(filtered);
+    }
+
+    function loadChatFromHistory(targetSessionId) {
+      if (targetSessionId === sessionId) return; // Already viewing this chat
+
+      // Save current chat first
+      saveChatToHistory();
+
+      // Switch to target session
+      localStorage.setItem(SESSION_KEY, targetSessionId);
+      // Also load the patient for this session from the index
+      const index = getChatIndex();
+      const entry = index.find(function(e) { return e.id === targetSessionId; });
+      if (entry && entry.patient_id) {
+        localStorage.setItem(PATIENT_ID_KEY, entry.patient_id);
+      }
+      window.location.reload();
+    }
+
+    function renderChatHistory() {
+      const list = document.getElementById('history-list');
+      const filterPid = document.getElementById('history-filter-patient').value;
+      let index = getChatIndex();
+
+      if (filterPid) {
+        index = index.filter(function(e) { return e.patient_id === filterPid; });
+      }
+
+      if (index.length === 0) {
+        list.innerHTML = '<div class="obs-no-data">No saved chats yet</div>';
+        return;
+      }
+
+      let html = '';
+      index.forEach(function(entry) {
+        const isActive = entry.id === sessionId ? ' active' : '';
+        const timeStr = formatHistoryTime(entry.created_at);
+        html += '<div class="history-item' + isActive + '" data-session-id="' + escapeHtml(entry.id) + '">';
+        html += '<div class="history-item-patient">' + escapeHtml(entry.patient_name) + '</div>';
+        html += '<div class="history-item-title">' + escapeHtml(entry.title) + '</div>';
+        html += '<div class="history-item-meta">' + escapeHtml(timeStr) + ' &middot; ' + entry.message_count + ' msgs</div>';
+        html += '</div>';
+      });
+      list.innerHTML = html;
+
+      // Attach click handlers
+      list.querySelectorAll('.history-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          loadChatFromHistory(item.dataset.sessionId);
+        });
+      });
+    }
+
+    function formatHistoryTime(isoStr) {
+      try {
+        const d = new Date(isoStr);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 1) return 'Just now';
+        if (diffMin < 60) return diffMin + 'm ago';
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return diffHr + 'h ago';
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffDay < 7) return diffDay + 'd ago';
+        return d.toLocaleDateString();
+      } catch { return ''; }
+    }
+
+    // Toggle history sidebar
+    function toggleHistorySidebar() {
+      document.getElementById('history-sidebar').classList.toggle('open');
+      document.getElementById('history-toggle').classList.toggle('open');
+    }
+    document.getElementById('history-toggle').addEventListener('click', function() {
+      toggleHistorySidebar();
+      renderChatHistory(); // Refresh on open
+    });
+    document.getElementById('history-close').addEventListener('click', toggleHistorySidebar);
+    document.getElementById('history-filter-patient').addEventListener('change', renderChatHistory);
+
+    // Restore patient selection from localStorage
+    (function restorePatientId() {
+      const savedPid = localStorage.getItem(PATIENT_ID_KEY);
+      if (savedPid && patientSelect.querySelector('option[value="' + savedPid + '"]')) {
+        patientSelect.value = savedPid;
+        updatePatientContext();
+      }
+    })();
+
+    // Save patient_id to localStorage on change
+    patientSelect.addEventListener('change', function() {
+      if (patientSelect.value) {
+        localStorage.setItem(PATIENT_ID_KEY, patientSelect.value);
+      } else {
+        localStorage.removeItem(PATIENT_ID_KEY);
+      }
+    });
+
+    // New Chat button — save current chat, then clear session and start fresh
+    // Observability is not cleared here; only when user explicitly hits Clear
+    document.getElementById('new-chat-btn').addEventListener('click', () => {
+      saveChatToHistory();
+      localStorage.removeItem(SESSION_KEY);
+      window.location.reload();
+    });

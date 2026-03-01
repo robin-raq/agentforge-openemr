@@ -15,6 +15,17 @@ npx tsx eval/run-eval.ts
 
 Requires a valid `.env` with `ANTHROPIC_API_KEY` (and FHIR credentials if `DATA_SOURCE=fhir`).
 
+### CLI Options
+
+| Flag | Description |
+|------|-------------|
+| `--resume` | Skip previously passed cases (loads from `results.json`) |
+| `--sequential` | Run cases one at a time (concurrency=1). Use for latency benchmarking — parallel runs can trigger API throttling and inflate single-tool latency. |
+| `--concurrency=N` | Override default concurrency (default: 3) |
+| `--rubric` | Enable LLM-as-judge rubric scoring per case |
+| `--category=X` | Filter to a specific category |
+| `--id=X` | Run a single test case |
+
 ## Test Case Schema
 
 ```json
