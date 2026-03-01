@@ -104,12 +104,22 @@ export async function getDrugLabel(
   return parseSplSections(xml);
 }
 
+/** Default sections for patient-facing discharge education (smaller payload). */
+export const DISCHARGE_EDUCATION_SECTIONS = new Set([
+  SPL_SECTION_CODES.INDICATIONS,
+  SPL_SECTION_CODES.ADVERSE_REACTIONS,
+  SPL_SECTION_CODES.WARNINGS_PRECAUTIONS,
+]);
+
 /**
  * High-level function: search for a drug and return patient-education info.
  * Combines search + label fetch into one call.
+ *
+ * Pass `onlySections` to limit which SPL sections are returned (saves tokens).
  */
 export async function getDrugEducation(
-  drugName: string
+  drugName: string,
+  onlySections?: Set<string>
 ): Promise<DrugEducationInfo | null> {
   const results = await searchDrug(drugName, 1);
   if (results.length === 0) return null;
@@ -118,6 +128,7 @@ export async function getDrugEducation(
   const sections = await getDrugLabel(top.setid);
 
   const findSection = (code: string): string | null => {
+    if (onlySections && !onlySections.has(code)) return null;
     const section = sections.find((s) => s.code === code);
     return section ? section.text : null;
   };

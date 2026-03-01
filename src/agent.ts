@@ -16,11 +16,12 @@ import { saveToChart } from "./tools/save-to-chart";
 import { generateDischargeInstructions } from "./tools/generate-discharge-instructions";
 import { applyVerification } from "./verification/verification";
 import { getErrorMessage } from "./utils/errors";
-
-const AGENT_TIMEOUT_MS = 90_000;
-const MAX_HISTORY_MESSAGES = 20;
-const MAX_RESPONSE_TOKENS = 2048;
-const HISTORY_ENTRY_TRUNCATE_CHARS = 1500;
+import {
+  AGENT_TIMEOUT_MS,
+  MAX_HISTORY_MESSAGES,
+  MAX_RESPONSE_TOKENS,
+  HISTORY_ENTRY_TRUNCATE_CHARS,
+} from "./constants";
 
 /** Per-tool execution trace with real timing from LangChain callbacks. */
 export interface ToolTrace {

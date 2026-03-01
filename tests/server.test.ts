@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
 
-import { createApp, setSessionHistory, detectInjection, getSessionHistory, loadSessionsFromDisk, schedulePersist } from "../src/server";
+import { createApp, setSessionHistory, detectInjection, getSessionHistory, loadSessionsFromDisk, schedulePersist, buildChatResponse } from "../src/server";
 import { getDataSource } from "../src/config";
+import type { ChatResult } from "../src/agent";
 
 const originalEnv = { ...process.env };
 
@@ -467,6 +468,29 @@ describe("server", () => {
     });
   });
 
+  describe("Content-Type validation", () => {
+    it("rejects POST with text/plain Content-Type with 415", async () => {
+      const res = await makeRequest(app, "POST", "/api/chat", undefined, {
+        "Content-Type": "text/plain",
+      });
+      expect(res.status).toBe(415);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("application/json");
+    });
+
+    it("rejects PUT with text/plain Content-Type with 415", async () => {
+      const res = await makeRequest(app, "PUT", "/api/documents/test-doc", undefined, {
+        "Content-Type": "text/plain",
+      });
+      expect(res.status).toBe(415);
+    });
+
+    it("allows GET requests without Content-Type check", async () => {
+      const res = await makeRequest(app, "GET", "/api/health");
+      expect(res.status).toBe(200);
+    });
+  });
+
   describe("session disk persistence", () => {
     it("loadSessionsFromDisk does not throw when no file exists", () => {
       expect(() => loadSessionsFromDisk()).not.toThrow();
@@ -524,6 +548,170 @@ describe("server", () => {
 
     it("does NOT flag medication reconciliation requests", () => {
       expect(detectInjection("Reconcile medications for patient 1's encounter")).toBe(false);
+    });
+  });
+
+  describe("buildChatResponse", () => {
+    function makeChatResult(overrides: Partial<ChatResult> = {}): ChatResult {
+      return {
+        response: "Patient summary\n\nSources: OpenEMR Patient Records\n\n⚕️ This information is for reference only and does not constitute medical advice.",
+        toolCalls: [{ name: "get_patient_summary", args: { patient_id: "1" } }],
+        safetyAlerts: [],
+        toolTraces: [{ tool: "get_patient_summary", duration_ms: 50, started_at: Date.now() }],
+        durationMs: 1200,
+        ...overrides,
+      };
+    }
+
+    it("returns correct query_type 'single_tool' for 1-tool result", () => {
+      const payload = buildChatResponse(makeChatResult());
+      expect(payload.performance.query_type).toBe("single_tool");
+      expect(payload.timing.tool_count).toBe(1);
+    });
+
+    it("returns correct query_type 'multi_step' for 3+ tool result", () => {
+      const payload = buildChatResponse(makeChatResult({
+        toolCalls: [
+          { name: "get_patient_summary", args: {} },
+          { name: "get_medications", args: {} },
+          { name: "drug_interaction_check", args: {} },
+        ],
+        toolTraces: [
+          { tool: "get_patient_summary", duration_ms: 30, started_at: Date.now() },
+          { tool: "get_medications", duration_ms: 20, started_at: Date.now() },
+          { tool: "drug_interaction_check", duration_ms: 40, started_at: Date.now() },
+        ],
+      }));
+      expect(payload.performance.query_type).toBe("multi_step");
+    });
+
+    it("returns correct sources array for patient tools", () => {
+      const payload = buildChatResponse(makeChatResult());
+      expect(payload.structured_result.sources).toContain("OpenEMR Patient Records");
+    });
+
+    it("includes FDA source when drug_interaction_check is used", () => {
+      const payload = buildChatResponse(makeChatResult({
+        toolCalls: [{ name: "drug_interaction_check", args: {} }],
+        toolTraces: [{ tool: "drug_interaction_check", duration_ms: 100, started_at: Date.now() }],
+      }));
+      expect(payload.structured_result.sources).toContain("OpenFDA Drug Interaction Database");
+    });
+
+    it("confidence_score is in valid range 0-1", () => {
+      const payload = buildChatResponse(makeChatResult());
+      expect(payload.structured_result.confidence_score).toBeGreaterThanOrEqual(0);
+      expect(payload.structured_result.confidence_score).toBeLessThanOrEqual(1);
+    });
+
+    it("sets needs_escalation when safety alert contains CRITICAL", () => {
+      const payload = buildChatResponse(makeChatResult({
+        safetyAlerts: ["⚠️ CRITICAL LAB: INR = 5.2 (ref: 2.0-3.0)"],
+      }));
+      expect(payload.structured_result.verification.needs_escalation).toBe(true);
+    });
+
+    it("computes timing breakdown correctly", () => {
+      const payload = buildChatResponse(makeChatResult({
+        durationMs: 2000,
+        toolTraces: [{ tool: "get_patient_summary", duration_ms: 800, started_at: Date.now() }],
+      }));
+      expect(payload.timing.total_ms).toBe(2000);
+      expect(payload.timing.tool_ms).toBe(800);
+      expect(payload.timing.llm_ms).toBe(1200);
+    });
+
+    it("returns zero_or_two_tool for 0 or 2 tool calls", () => {
+      const payloadZero = buildChatResponse(makeChatResult({
+        toolCalls: [],
+        toolTraces: [],
+      }));
+      expect(payloadZero.performance.query_type).toBe("zero_or_two_tool");
+
+      const payloadTwo = buildChatResponse(makeChatResult({
+        toolCalls: [
+          { name: "get_patient_summary", args: {} },
+          { name: "get_medications", args: {} },
+        ],
+        toolTraces: [
+          { tool: "get_patient_summary", duration_ms: 30, started_at: Date.now() },
+          { tool: "get_medications", duration_ms: 20, started_at: Date.now() },
+        ],
+      }));
+      expect(payloadTwo.performance.query_type).toBe("zero_or_two_tool");
+    });
+  });
+
+  describe("UI clinician branding", () => {
+    it("GET / serves HTML with clinician-banner element", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.status).toBe(200);
+      expect(res.body).toContain("clinician-banner");
+      expect(res.body).toContain("Authorized Healthcare Providers");
+    });
+
+    it("GET / serves HTML with app-layout flex container", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.body).toContain("app-layout");
+      expect(res.body).toContain("main-content");
+    });
+
+    it("GET / serves HTML with observability sidebar open by default", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.body).toContain('class="obs-sidebar open"');
+    });
+
+    it("GET / serves HTML with clinical disclaimer in footer", async () => {
+      const res = await makeRequest(app, "GET", "/");
+      expect(res.body).toContain("Not a substitute for clinical judgment");
+    });
+  });
+
+  describe("sessions listing endpoint", () => {
+    it("GET /api/sessions returns 200 with sessions array", async () => {
+      const res = await makeRequest(app, "GET", "/api/sessions");
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.sessions).toBeDefined();
+      expect(Array.isArray(body.sessions)).toBe(true);
+    });
+
+    it("GET /api/sessions includes session with messages", async () => {
+      const sid = "sessions-list-test-" + Date.now();
+      setSessionHistory(sid, [
+        { role: "user", content: "What meds is patient 1 on?" },
+        { role: "assistant", content: "Patient 1 is on warfarin, metformin..." },
+      ]);
+      const res = await makeRequest(app, "GET", "/api/sessions");
+      const body = JSON.parse(res.body);
+      const found = body.sessions.find((s: any) => s.session_id === sid);
+      expect(found).toBeDefined();
+      expect(found.message_count).toBe(2);
+      expect(found.first_message).toContain("What meds");
+    });
+
+    it("GET /api/sessions returns empty array when no sessions exist matching filter", async () => {
+      const res = await makeRequest(app, "GET", "/api/sessions?patient_id=nonexistent999");
+      const body = JSON.parse(res.body);
+      expect(body.sessions).toEqual([]);
+    });
+
+    it("GET /api/sessions filters by patient_id", async () => {
+      const sid = "patient-filter-test-" + Date.now();
+      setSessionHistory(sid, [
+        { role: "user", content: "[Context: Currently viewing patient 3]\n\nCheck allergies" },
+        { role: "assistant", content: "Patient 3 has allergies to..." },
+      ]);
+      const res = await makeRequest(app, "GET", "/api/sessions?patient_id=3");
+      const body = JSON.parse(res.body);
+      const found = body.sessions.find((s: any) => s.session_id === sid);
+      expect(found).toBeDefined();
+
+      // Should NOT appear when filtering for patient 1
+      const res2 = await makeRequest(app, "GET", "/api/sessions?patient_id=1");
+      const body2 = JSON.parse(res2.body);
+      const notFound = body2.sessions.find((s: any) => s.session_id === sid);
+      expect(notFound).toBeUndefined();
     });
   });
 });

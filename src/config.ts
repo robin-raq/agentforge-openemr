@@ -131,8 +131,8 @@ export function getLangfuseCallbacks(sessionId?: string): unknown[] {
         tags: ["agentforge"],
       }),
     ];
-  } catch {
-    // @langfuse/langchain not installed or init failed
+  } catch (err) {
+    console.warn("Langfuse callback handler init failed:", err instanceof Error ? err.message : err);
   }
   return [];
 }
