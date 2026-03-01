@@ -309,7 +309,188 @@ async function runEval() {
   // Shared flag: set to true on fatal API errors to abort remaining tasks
   let abortEarly = false;
 
-  // ── Single case executor (extracted for concurrency) ──
+  // ─── Execution Result (shared return type for execution helpers) ───
+
+  interface ExecutionOutput {
+    result: Awaited<ReturnType<typeof chat>>;
+    toolsUsed: string[];
+    duration_ms: number;
+  }
+
+  // ── Execution Helper: Single-turn ──
+  async function runSingleTurn(
+    tc: TestCase,
+    start: number,
+  ): Promise<ExecutionOutput> {
+    const result = await chat(tc.query!, `eval-${tc.id}`, []);
+    const toolsUsed = result.toolCalls.map((t) => t.name);
+    const duration_ms = Date.now() - start;
+    return { result, toolsUsed, duration_ms };
+  }
+
+  // ── Execution Helper: Multi-turn ──
+  async function runMultiTurn(
+    tc: TestCase,
+    start: number,
+  ): Promise<ExecutionOutput> {
+    const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+    let result!: Awaited<ReturnType<typeof chat>>;
+
+    for (let i = 0; i < tc.turns!.length; i++) {
+      const turn = tc.turns![i];
+      const sessionId = `eval-${tc.id}-turn${i}`;
+      result = await chat(turn.query, sessionId, history);
+      if (i < tc.turns!.length - 1 && verbose) {
+        console.log(`   Turn ${i + 1}/${tc.turns!.length}: "${turn.query.slice(0, 60)}..." → ${result.toolCalls.length} tools`);
+      }
+    }
+
+    const toolsUsed = result.toolCalls.map((t) => t.name);
+    const duration_ms = Date.now() - start;
+    return { result, toolsUsed, duration_ms };
+  }
+
+  // ── Execution Helper: Consistency test ──
+  async function runConsistencyTest(
+    tc: TestCase,
+    start: number,
+    failures: string[],
+  ): Promise<ExecutionOutput> {
+    const runResults: string[] = [];
+    let result!: Awaited<ReturnType<typeof chat>>;
+
+    for (let i = 0; i < tc.consistency_runs!; i++) {
+      const runResult = await chat(tc.query!, `eval-${tc.id}-run${i}`, []);
+      runResults.push(runResult.response);
+      if (i === 0) {
+        result = runResult; // Use first run for standard assertions
+      }
+    }
+
+    const toolsUsed = result.toolCalls.map((t) => t.name);
+    const duration_ms = Date.now() - start;
+
+    // Check consistency: all keywords must appear in ALL runs
+    if (tc.consistency_keywords) {
+      for (const keyword of tc.consistency_keywords) {
+        const missingInRun = runResults.findIndex(
+          (r) => !r.toLowerCase().includes(keyword.toLowerCase())
+        );
+        if (missingInRun >= 0) {
+          failures.push(`consistency: "${keyword}" missing in run ${missingInRun + 1}/${tc.consistency_runs}`);
+        }
+      }
+    }
+
+    return { result, toolsUsed, duration_ms };
+  }
+
+  // ── Assertion Helper: shared assertions and scoring ──
+
+  interface AssertionOutput {
+    hasHallucination: boolean;
+    hasSourceCitation: boolean;
+    hasDisclaimer: boolean;
+    verificationCorrect: boolean;
+    noToolViolated: boolean;
+    rubricResult?: RubricResult;
+    rubricQualityGate?: { passed: boolean; failures: string[] };
+  }
+
+  async function runAssertions(
+    tc: TestCase,
+    result: Awaited<ReturnType<typeof chat>>,
+    toolsUsed: string[],
+    duration_ms: number,
+    failures: string[],
+  ): Promise<AssertionOutput> {
+    const category = tc.category || "golden_set";
+
+    // 1. Check expected tools were called
+    const toolCheck = checkTools(tc.expected_tools, toolsUsed);
+    if (!toolCheck.passed) {
+      failures.push(`missing tools: ${toolCheck.missing.join(", ")} (got: ${toolsUsed.join(", ") || "none"})`);
+    }
+
+    // 2. Check no-tools-called for adversarial cases
+    const noToolCheck = checkNoToolsCalled(tc.expected_tools, toolsUsed, category);
+    if (noToolCheck.violated) {
+      failures.push(`adversarial case called restricted tools: ${noToolCheck.tools_called.join(", ")}`);
+    }
+
+    // 3. Check must_contain
+    const contentCheck = checkMustContain(tc.must_contain, result.response);
+    if (!contentCheck.passed) {
+      for (const m of contentCheck.missing) {
+        failures.push(`must_contain missing: "${m}"`);
+      }
+    }
+
+    // 4. Check must_not_contain (hallucination detection)
+    const negativeCheck = checkMustNotContain(tc.must_not_contain, result.response);
+    const hasHallucination = !negativeCheck.passed;
+    if (hasHallucination) {
+      for (const f of negativeCheck.found) {
+        failures.push(`must_not_contain found: "${f}"`);
+      }
+    }
+
+    // 5. Check latency assertion
+    if (tc.max_latency_ms && duration_ms > tc.max_latency_ms) {
+      failures.push(`latency ${duration_ms}ms exceeds max ${tc.max_latency_ms}ms`);
+    }
+
+    // ── Verification Metrics ──
+
+    const hasSourceCitation = /sources:/i.test(result.response);
+    const hasDisclaimer = /reference only|medical advice/i.test(result.response);
+
+    // Verification accuracy: safety alerts + scope enforcement
+    const isSafetyCase = category.includes("safety") || category.includes("adversarial");
+    const hasSafetyAlerts = result.safetyAlerts.length > 0;
+    const verificationCorrect = isSafetyCase
+      ? (hasSafetyAlerts || toolCheck.passed)
+      : !result.safetyAlerts.some((a) => /SCOPE WARNING/i.test(a));
+
+    // ── Rubric Scoring (Stage 4 — optional via --rubric flag) ──
+
+    let rubricResult: RubricResult | undefined;
+    let rubricQualityGate: { passed: boolean; failures: string[] } | undefined;
+
+    if (enableRubric) {
+      try {
+        rubricResult = await scoreWithRubric(
+          tc.query,
+          result.response,
+          toolsUsed,
+          category
+        );
+        rubricQualityGate = checkQualityGate(rubricResult);
+
+        if (verbose && rubricResult.overall_score >= 0) {
+          const dims = rubricResult.scores
+            .map((s) => `${s.dimension}=${s.score}`)
+            .join(", ");
+          console.log(`   📊 Rubric: ${rubricResult.overall_score.toFixed(1)}/5 (${rubricResult.quality_level}) [${dims}]`);
+        }
+      } catch (rubricErr) {
+        // Don't fail the eval case if rubric judging fails
+        console.warn(`   ⚠️ Rubric judge error for ${tc.id}: ${rubricErr}`);
+      }
+    }
+
+    return {
+      hasHallucination,
+      hasSourceCitation,
+      hasDisclaimer,
+      verificationCorrect,
+      noToolViolated: noToolCheck.violated,
+      rubricResult,
+      rubricQualityGate,
+    };
+  }
+
+  // ── Single case executor (thin orchestrator) ──
   async function runSingleCase(tc: TestCase): Promise<EvalResult> {
     // Skip previously passed cases in resume mode
     if (skipIds.has(tc.id)) {
@@ -333,139 +514,24 @@ async function runEval() {
     const start = Date.now();
 
     try {
-      // ── Execute query (supports single-turn, multi-turn, and consistency) ──
-      let result: Awaited<ReturnType<typeof chat>>;
-      let toolsUsed: string[];
-      let duration_ms: number;
-      const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+      // ── Execute query (dispatch to the appropriate mode) ──
+      let execution: ExecutionOutput;
 
       if (tc.turns && tc.turns.length > 0) {
-        // ── Multi-turn conversation test ──
-        // Run all turns sequentially, building up history.
-        // Assertions are evaluated only on the FINAL turn.
-        for (let i = 0; i < tc.turns.length; i++) {
-          const turn = tc.turns[i];
-          const sessionId = `eval-${tc.id}-turn${i}`;
-          result = await chat(turn.query, sessionId, history);
-          if (i < tc.turns.length - 1 && verbose) {
-            console.log(`   Turn ${i + 1}/${tc.turns.length}: "${turn.query.slice(0, 60)}..." → ${result.toolCalls.length} tools`);
-          }
-        }
-        // result is now the final turn's result
-        result = result!;
-        toolsUsed = result.toolCalls.map((t) => t.name);
-        duration_ms = Date.now() - start;
+        execution = await runMultiTurn(tc, start);
       } else if (tc.consistency_runs && tc.consistency_runs > 1) {
-        // ── Consistency test ──
-        // Run the same query N times; assert keywords appear in ALL runs.
-        const runResults: string[] = [];
-        for (let i = 0; i < tc.consistency_runs; i++) {
-          const runResult = await chat(tc.query!, `eval-${tc.id}-run${i}`, []);
-          runResults.push(runResult.response);
-          if (i === 0) {
-            result = runResult; // Use first run for standard assertions
-          }
-        }
-        result = result!;
-        toolsUsed = result.toolCalls.map((t) => t.name);
-        duration_ms = Date.now() - start;
-
-        // Check consistency: all keywords must appear in ALL runs
-        if (tc.consistency_keywords) {
-          for (const keyword of tc.consistency_keywords) {
-            const missingInRun = runResults.findIndex(
-              (r) => !r.toLowerCase().includes(keyword.toLowerCase())
-            );
-            if (missingInRun >= 0) {
-              failures.push(`consistency: "${keyword}" missing in run ${missingInRun + 1}/${tc.consistency_runs}`);
-            }
-          }
-        }
+        execution = await runConsistencyTest(tc, start, failures);
       } else {
-        // ── Standard single-turn test ──
-        result = await chat(tc.query!, `eval-${tc.id}`, []);
-        toolsUsed = result.toolCalls.map((t) => t.name);
-        duration_ms = Date.now() - start;
+        execution = await runSingleTurn(tc, start);
       }
 
-      const category = tc.category || "golden_set";
+      const { result, toolsUsed, duration_ms } = execution;
 
-      // ── Programmatic Assertions (cookbook eval_checks.py) ──
-
-      // 1. Check expected tools were called
-      const toolCheck = checkTools(tc.expected_tools, toolsUsed);
-      if (!toolCheck.passed) {
-        failures.push(`missing tools: ${toolCheck.missing.join(", ")} (got: ${toolsUsed.join(", ") || "none"})`);
-      }
-
-      // 2. Check no-tools-called for adversarial cases (NEW)
-      const noToolCheck = checkNoToolsCalled(tc.expected_tools, toolsUsed, category);
-      if (noToolCheck.violated) {
-        failures.push(`adversarial case called restricted tools: ${noToolCheck.tools_called.join(", ")}`);
-      }
-
-      // 3. Check must_contain
-      const contentCheck = checkMustContain(tc.must_contain, result.response);
-      if (!contentCheck.passed) {
-        for (const m of contentCheck.missing) {
-          failures.push(`must_contain missing: "${m}"`);
-        }
-      }
-
-      // 4. Check must_not_contain (hallucination detection)
-      const negativeCheck = checkMustNotContain(tc.must_not_contain, result.response);
-      const hasHallucination = !negativeCheck.passed;
-      if (hasHallucination) {
-        for (const f of negativeCheck.found) {
-          failures.push(`must_not_contain found: "${f}"`);
-        }
-      }
-
-      // 5. Check latency assertion
-      if (tc.max_latency_ms && duration_ms > tc.max_latency_ms) {
-        failures.push(`latency ${duration_ms}ms exceeds max ${tc.max_latency_ms}ms`);
-      }
-
-      // ── Verification Metrics ──
-
-      const hasSourceCitation = /sources:/i.test(result.response);
-      const hasDisclaimer = /reference only|medical advice/i.test(result.response);
-
-      // Verification accuracy: safety alerts + scope enforcement
-      const isSafetyCase = category.includes("safety") || category.includes("adversarial");
-      const hasSafetyAlerts = result.safetyAlerts.length > 0;
-      const verificationCorrect = isSafetyCase
-        ? (hasSafetyAlerts || toolCheck.passed)
-        : !result.safetyAlerts.some((a) => /SCOPE WARNING/i.test(a));
-
-      // ── Rubric Scoring (Stage 4 — optional via --rubric flag) ──
-
-      let rubricResult: RubricResult | undefined;
-      let rubricQualityGate: { passed: boolean; failures: string[] } | undefined;
-
-      if (enableRubric) {
-        try {
-          rubricResult = await scoreWithRubric(
-            tc.query,
-            result.response,
-            toolsUsed,
-            category
-          );
-          rubricQualityGate = checkQualityGate(rubricResult);
-
-          if (verbose && rubricResult.overall_score >= 0) {
-            const dims = rubricResult.scores
-              .map((s) => `${s.dimension}=${s.score}`)
-              .join(", ");
-            console.log(`   📊 Rubric: ${rubricResult.overall_score.toFixed(1)}/5 (${rubricResult.quality_level}) [${dims}]`);
-          }
-        } catch (rubricErr) {
-          // Don't fail the eval case if rubric judging fails
-          console.warn(`   ⚠️ Rubric judge error for ${tc.id}: ${rubricErr}`);
-        }
-      }
+      // ── Run shared assertions and scoring ──
+      const assertions = await runAssertions(tc, result, toolsUsed, duration_ms, failures);
 
       const pass = failures.length === 0;
+      const category = tc.category || "golden_set";
 
       const evalResult: EvalResult = {
         id: tc.id,
@@ -475,21 +541,21 @@ async function runEval() {
         duration_ms,
         tool_count: toolsUsed.length,
         safety_alerts: result.safetyAlerts,
-        has_hallucination: hasHallucination,
-        has_source_citation: hasSourceCitation,
-        has_disclaimer: hasDisclaimer,
-        verification_correct: verificationCorrect,
-        no_tool_violation: noToolCheck.violated,
+        has_hallucination: assertions.hasHallucination,
+        has_source_citation: assertions.hasSourceCitation,
+        has_disclaimer: assertions.hasDisclaimer,
+        verification_correct: assertions.verificationCorrect,
+        no_tool_violation: assertions.noToolViolated,
         category: tc.category,
         subcategory: tc.subcategory,
         difficulty: tc.difficulty,
-        rubric: rubricResult,
-        rubric_quality_gate: rubricQualityGate,
+        rubric: assertions.rubricResult,
+        rubric_quality_gate: assertions.rubricQualityGate,
       };
 
       const tag = ` [${category}/${tc.subcategory || "general"}]`;
-      const rubricTag = rubricResult && rubricResult.overall_score >= 0
-        ? ` (rubric: ${rubricResult.overall_score.toFixed(1)})`
+      const rubricTag = assertions.rubricResult && assertions.rubricResult.overall_score >= 0
+        ? ` (rubric: ${assertions.rubricResult.overall_score.toFixed(1)})`
         : "";
       console.log(`${pass ? "✅" : "❌"} ${tc.id}${tag}: ${pass ? "PASS" : failures.join("; ")} (${(duration_ms / 1000).toFixed(1)}s)${rubricTag}`);
 
@@ -528,6 +594,7 @@ async function runEval() {
       return evalResult;
     }
   }
+
 
   // ── Run eval cases concurrently (default: 3 at a time, 200ms stagger) ──
   if (sequential) {
