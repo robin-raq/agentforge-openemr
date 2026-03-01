@@ -123,8 +123,9 @@ export function drugInteractionCheck() {
                     }
                   }
                 }
-              } catch {
-                // Skip this pair
+              } catch (err) {
+                // QUAL-002: Log FDA API failures instead of silently swallowing
+                console.warn(`OpenFDA lookup failed for pair [${meds[i]}, ${meds[j]}]:`, err);
               }
             }
           }
@@ -140,7 +141,9 @@ export function drugInteractionCheck() {
         } finally {
           clearTimeout(timeout);
         }
-      } catch {
+      } catch (err) {
+        // QUAL-002: Log FDA API unavailability instead of silently swallowing
+        console.warn("OpenFDA API unavailable, using fallback DB:", err);
         return JSON.stringify({
           interactions: fallbackInteractions,
           note: fallbackInteractions.length === 0 ? "No known interactions found" : undefined,

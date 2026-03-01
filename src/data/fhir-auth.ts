@@ -29,6 +29,8 @@ export class FhirAuthManager {
   private accessToken: string | null = null;
   private expiresAt: number = 0;
   private refreshToken: string | null = null;
+  // PERF-001: Mutex to deduplicate concurrent token refresh requests
+  private refreshPromise: Promise<string> | null = null;
 
   constructor(config: FhirAuthConfig) {
     this.config = config;
@@ -42,12 +44,27 @@ export class FhirAuthManager {
       return this.accessToken;
     }
 
+    // PERF-001: If a refresh is already in flight, reuse the same promise
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this._doTokenRefresh();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  private async _doTokenRefresh(): Promise<string> {
     if (this.refreshToken) {
       try {
         const token = await this.refreshAccessToken();
         if (token) return token;
       } catch {
-        // Fall through to password grant
+        // Clear stale refresh token so we go straight to password grant next time
+        this.refreshToken = null;
       }
     }
 

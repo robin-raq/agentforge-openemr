@@ -138,22 +138,45 @@ export function generateDischargeInstructions(dataSource: DataSource) {
           warnings: string | null;
         }> = {};
 
-        // Fetch in parallel with a safety timeout per drug
+        // Truncate long DailyMed text to save context window tokens
+        const truncateText = (s: string | null, max = 300): string | null =>
+          s && s.length > max ? s.slice(0, max) + "..." : s;
+
+        // Fetch in parallel with per-drug timeout circuit breaker
+        const DRUG_EDUCATION_TIMEOUT_MS = 5_000;
+        const DRUG_EDUCATION_TOTAL_TIMEOUT_MS = 15_000;
+
         const educationPromises = medNamesForEducation.map(async (name) => {
           try {
-            const info = await getDrugEducation(name);
-            if (info) {
+            const result = await Promise.race([
+              getDrugEducation(name),
+              new Promise<null>((resolve) =>
+                setTimeout(() => resolve(null), DRUG_EDUCATION_TIMEOUT_MS)
+              ),
+            ]);
+            if (result) {
               drugEducation[name] = {
-                indications: info.indications,
-                adverse_reactions: info.adverse_reactions,
-                warnings: info.warnings,
+                indications: truncateText(result.indications),
+                adverse_reactions: truncateText(result.adverse_reactions),
+                warnings: truncateText(result.warnings),
               };
             }
           } catch {
-            // DailyMed unavailable — continue without it
+            // DailyMed unavailable for this drug — continue without it
+            console.warn(`DailyMed education lookup failed for ${name}`);
           }
         });
-        await Promise.all(educationPromises);
+
+        // Overall timeout for all drug education lookups
+        await Promise.race([
+          Promise.all(educationPromises),
+          new Promise<void>((resolve) =>
+            setTimeout(() => {
+              console.warn("DailyMed education lookups exceeded total timeout, continuing without remaining");
+              resolve();
+            }, DRUG_EDUCATION_TOTAL_TIMEOUT_MS)
+          ),
+        ]);
 
         // Build warning signs from conditions + diagnoses
         const allConditions = [
@@ -235,7 +258,7 @@ export function generateDischargeInstructions(dataSource: DataSource) {
               (m) => m.status !== "discontinued"
             ).length,
           },
-          data_sources: ["OpenEMR", "DailyMed (NLM/NIH)"],
+          data_source: "OpenEMR + DailyMed",
         });
       } catch (err) {
         return JSON.stringify({

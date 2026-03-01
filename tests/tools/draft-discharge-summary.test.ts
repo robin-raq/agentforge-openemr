@@ -63,9 +63,10 @@ describe("draft_discharge_summary", () => {
     const result = JSON.parse(
       await toolFn.invoke({ patient_id: "1", encounter_id: "enc-101" })
     );
-    expect(result.labs_at_discharge.all.length).toBeGreaterThan(0);
+    expect(result.labs_at_discharge.total_count).toBeGreaterThan(0);
     expect(result.labs_at_discharge).toHaveProperty("critical");
     expect(result.labs_at_discharge).toHaveProperty("abnormal");
+    expect(result.labs_at_discharge).toHaveProperty("normal");
   });
 
   it("sets safety_flags.has_critical_labs correctly for patient 1", async () => {

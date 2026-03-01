@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyVerification } from "../src/verification/verification";
+import { applyVerification, detectPrescriptiveLanguage } from "../src/verification/verification";
 
 describe("verification", () => {
   it("adds safety alert for serious drug interactions", () => {
@@ -341,6 +341,62 @@ describe("verification", () => {
       ]);
       expect(result.response).toContain("DailyMed (NLM/NIH)");
       expect(result.response).toContain("OpenEMR Patient Records");
+    });
+  });
+
+  describe("prescriptive language detection (ADV-002)", () => {
+    it("detects 'I prescribe'", () => {
+      expect(detectPrescriptiveLanguage("I prescribe amoxicillin 500mg")).toBe(true);
+    });
+
+    it("detects 'I have prescribed'", () => {
+      expect(detectPrescriptiveLanguage("I have prescribed warfarin 5mg")).toBe(true);
+    });
+
+    it("detects 'you should take'", () => {
+      expect(detectPrescriptiveLanguage("you should take ibuprofen for pain")).toBe(true);
+    });
+
+    it("detects 'I recommend you take'", () => {
+      expect(detectPrescriptiveLanguage("I recommend you take aspirin daily")).toBe(true);
+    });
+
+    it("detects 'start taking'", () => {
+      expect(detectPrescriptiveLanguage("You can start taking metformin tomorrow")).toBe(true);
+    });
+
+    it("detects 'I have ordered'", () => {
+      expect(detectPrescriptiveLanguage("I have ordered a blood panel for you")).toBe(true);
+    });
+
+    it("detects 'dose has been increased'", () => {
+      expect(detectPrescriptiveLanguage("The dose has been increased to 20mg")).toBe(true);
+    });
+
+    it("detects 'has been finalized and saved to chart'", () => {
+      expect(detectPrescriptiveLanguage("The document has been finalized and saved to chart")).toBe(true);
+    });
+
+    it("does NOT flag 'I cannot prescribe'", () => {
+      expect(detectPrescriptiveLanguage("I cannot prescribe medications")).toBe(false);
+    });
+
+    it("does NOT flag normal clinical data responses", () => {
+      expect(detectPrescriptiveLanguage("Patient 1 is currently taking warfarin 5mg daily")).toBe(false);
+    });
+
+    it("does NOT flag refusal language", () => {
+      expect(detectPrescriptiveLanguage("I'm unable to recommend treatments or prescribe medications. Please consult your healthcare provider.")).toBe(false);
+    });
+
+    it("adds SCOPE WARNING alert when prescriptive language detected", () => {
+      const result = applyVerification("I prescribe amoxicillin 500mg three times daily.", []);
+      expect(result.safetyAlerts.some((a) => a.includes("SCOPE WARNING"))).toBe(true);
+    });
+
+    it("does NOT add SCOPE WARNING for clean responses", () => {
+      const result = applyVerification("Patient 1 is on warfarin 5mg daily.", []);
+      expect(result.safetyAlerts.some((a) => a.includes("SCOPE WARNING"))).toBe(false);
     });
   });
 });

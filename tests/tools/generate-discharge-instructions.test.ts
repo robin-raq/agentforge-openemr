@@ -143,8 +143,8 @@ describe("generate_discharge_instructions", () => {
     const result = JSON.parse(
       await toolFn.invoke({ patient_id: "1", encounter_id: "enc-101" })
     );
-    expect(result.data_sources).toContain("OpenEMR");
-    expect(result.data_sources).toContain("DailyMed (NLM/NIH)");
+    expect(result.data_source).toContain("OpenEMR");
+    expect(result.data_source).toContain("DailyMed");
   });
 
   it("includes scheduled_appointments array in output", async () => {

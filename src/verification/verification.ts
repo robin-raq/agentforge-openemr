@@ -1,6 +1,23 @@
 const MEDICAL_DISCLAIMER =
   "\n\n⚕️ This information is for reference only and does not constitute medical advice. Always consult a healthcare provider.";
 
+// ADV-002: Detect prescriptive language that slipped past the system prompt guardrails
+const PRESCRIPTIVE_PATTERNS: RegExp[] = [
+  /\bI (?:have )?prescribe[d]?\b/i,
+  /\bI (?:have )?ordered\b/i,
+  /\bI (?:have )?(?:placed an order|submitted an order)\b/i,
+  /\byou should (?:take|start|begin|try|use)\b/i,
+  /\bI (?:recommend|suggest|advise) (?:you |that you )?(?:take|start|begin|try|use)\b/i,
+  /\b(?:start|begin) taking\b/i,
+  /\bdose (?:has been|was) (?:increased|decreased|changed|modified)\b/i,
+  /\b(?:has been|was) (?:finalized|approved) (?:and saved |to (?:the )?chart)/i,
+  /\bI (?:have )?(?:discontinued|stopped|removed) (?:the |your )?(?:medication|warfarin|lisinopril|metformin|insulin|aspirin|metoprolol|amlodipine|heparin)/i,
+];
+
+export function detectPrescriptiveLanguage(response: string): boolean {
+  return PRESCRIPTIVE_PATTERNS.some((p) => p.test(response));
+}
+
 const PATIENT_TOOLS = new Set([
   "get_patient_summary",
   "get_medications",
@@ -184,6 +201,14 @@ export function applyVerification(
         // Ignore parse errors
       }
     }
+  }
+
+  // ADV-002: Post-LLM check for prescriptive language that slipped through
+  if (detectPrescriptiveLanguage(response)) {
+    safetyAlerts.push(
+      "⚠️ SCOPE WARNING: Response may contain prescriptive language. This system provides data retrieval only — not medical recommendations."
+    );
+    console.warn("ADV-002: Prescriptive language detected in response");
   }
 
   let finalResponse = response;
