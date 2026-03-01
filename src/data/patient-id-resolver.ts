@@ -1,4 +1,4 @@
-const MAX_CACHE_SIZE = 100;
+import { TtlCache } from "../cache";
 
 export interface PatientIdResolverConfig {
   apiBaseUrl: string;
@@ -13,7 +13,7 @@ interface PatientApiResponse {
 export class PatientIdResolver {
   private apiBaseUrl: string;
   private getAccessToken: () => Promise<string>;
-  private cache = new Map<string, string>();
+  private cache = new TtlCache<string>({ ttlMs: 300_000, maxEntries: 100 });
 
   constructor(config: PatientIdResolverConfig) {
     this.apiBaseUrl = config.apiBaseUrl.replace(/\/$/, "");
@@ -49,15 +49,7 @@ export class PatientIdResolver {
       throw new Error(`Patient ${pid} has no UUID in response`);
     }
 
-    this.setCache(pid, uuid);
-    return uuid;
-  }
-
-  private setCache(pid: string, uuid: string): void {
-    if (this.cache.size >= MAX_CACHE_SIZE) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey) this.cache.delete(firstKey);
-    }
     this.cache.set(pid, uuid);
+    return uuid;
   }
 }

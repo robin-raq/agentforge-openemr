@@ -108,4 +108,93 @@ describe("PatientIdResolver", () => {
 
     expect(uuid).toBe("a1b2c3d4-0000-0000-0000-000000000000");
   });
+
+  describe("cache TTL", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("returns cached UUID within TTL window", async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ uuid: "uuid-ttl-test-1" }),
+      });
+
+      const resolver = new PatientIdResolver({
+        apiBaseUrl: "https://localhost:9300/apis/default/api",
+        getAccessToken: getToken,
+      });
+
+      await resolver.resolveToUuid("10");
+      // Advance time but stay within 5-minute TTL
+      vi.advanceTimersByTime(299_999);
+      await resolver.resolveToUuid("10");
+
+      // Should have only fetched once — cache hit
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-fetches UUID after TTL expires", async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ uuid: "uuid-ttl-test-2" }),
+      });
+
+      const resolver = new PatientIdResolver({
+        apiBaseUrl: "https://localhost:9300/apis/default/api",
+        getAccessToken: getToken,
+      });
+
+      await resolver.resolveToUuid("20");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Advance past 5-minute TTL (300_000ms)
+      vi.advanceTimersByTime(300_001);
+
+      await resolver.resolveToUuid("20");
+      // Should have re-fetched
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("evicts oldest entry when cache is full", async () => {
+      const resolver = new PatientIdResolver({
+        apiBaseUrl: "https://localhost:9300/apis/default/api",
+        getAccessToken: getToken,
+      });
+
+      // Fill cache to max (100 entries)
+      for (let i = 1; i <= 100; i++) {
+        fetchMock.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ uuid: `uuid-${i}` }),
+        });
+        await resolver.resolveToUuid(`${i}`);
+      }
+
+      expect(fetchMock).toHaveBeenCalledTimes(100);
+
+      // Add one more — should evict pid "1"
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ uuid: "uuid-101" }),
+      });
+      await resolver.resolveToUuid("101");
+      expect(fetchMock).toHaveBeenCalledTimes(101);
+
+      // Now pid "1" should have been evicted, requiring a re-fetch
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ uuid: "uuid-1-refetch" }),
+      });
+      const refetched = await resolver.resolveToUuid("1");
+      expect(fetchMock).toHaveBeenCalledTimes(102);
+      expect(refetched).toBe("uuid-1-refetch");
+    });
+  });
 });
