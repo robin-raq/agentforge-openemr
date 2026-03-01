@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { applyVerification, detectPrescriptiveLanguage } from "../src/verification/verification";
 
 describe("verification", () => {
@@ -397,6 +397,48 @@ describe("verification", () => {
     it("does NOT add SCOPE WARNING for clean responses", () => {
       const result = applyVerification("Patient 1 is on warfarin 5mg daily.", []);
       expect(result.safetyAlerts.some((a) => a.includes("SCOPE WARNING"))).toBe(false);
+    });
+  });
+
+  describe("parse error logging", () => {
+    it("logs warning when drug_interaction_check result is malformed JSON", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      applyVerification("test response", [
+        { name: "drug_interaction_check", args: {}, result: "not valid json{{{" },
+      ]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("drug_interaction_check")
+      );
+      warnSpy.mockRestore();
+    });
+
+    it("logs warning when allergy_check result is malformed JSON", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      applyVerification("test response", [
+        { name: "allergy_check", args: {}, result: "{{invalid" },
+      ]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("allergy_check")
+      );
+      warnSpy.mockRestore();
+    });
+
+    it("still returns valid result when parse error occurs", () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = applyVerification("test response", [
+        { name: "drug_interaction_check", args: {}, result: "bad json" },
+      ]);
+
+      // Should still return a valid result, not throw
+      expect(result.response).toContain("test response");
+      expect(result.safetyAlerts).toBeDefined();
+
+      vi.restoreAllMocks();
     });
   });
 });
