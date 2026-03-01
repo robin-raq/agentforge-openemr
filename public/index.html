@@ -208,10 +208,13 @@
       cursor: pointer;
     }
     .patient-selector select option { color: #1e293b; background: white; }
-    .patient-selector select.locked {
+    .patient-selector select.locked,
+    .patient-selector select:disabled {
       opacity: 0.7;
       pointer-events: none;
       border-color: rgba(255,255,255,0.15);
+      -webkit-appearance: none;
+      cursor: not-allowed;
     }
     .patient-lock-hint {
       font-size: 0.625rem;
@@ -1928,6 +1931,7 @@
     // Lock/unlock the patient dropdown — one patient per chat session
     function lockPatientDropdown() {
       patientSelect.classList.add('locked');
+      patientSelect.disabled = true;
       var hint = document.getElementById('patient-lock-hint');
       if (!hint) {
         hint = document.createElement('span');
@@ -1941,6 +1945,7 @@
     }
     function unlockPatientDropdown() {
       patientSelect.classList.remove('locked');
+      patientSelect.disabled = false;
       var hint = document.getElementById('patient-lock-hint');
       if (hint) hint.style.display = 'none';
     }
@@ -2518,7 +2523,7 @@
       messageInput.disabled = true;
       setThinking(true);
       try {
-        const patientId = patientSelect.value || null;
+        const patientId = patientIdForThisChat || patientSelect.value || null;
         obsTracker.lastQuery = msg;
         const res = await fetch('/api/chat', {
           method: 'POST',
