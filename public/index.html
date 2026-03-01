@@ -1466,11 +1466,15 @@
   <script>
     // Session persistence: reuse session_id across page reloads via localStorage
     const SESSION_KEY = 'agentforge_session_id';
+    const PENDING_SEND_KEY = 'agentforge_pending_send';
     const sessionId = localStorage.getItem(SESSION_KEY) || 'session-' + crypto.randomUUID();
     localStorage.setItem(SESSION_KEY, sessionId);
 
-    // --- Observability Tracker (persisted to localStorage per session) ---
-    const OBS_STORAGE_KEY = 'agentforge_obs_' + sessionId;
+    // Track which patient this chat is for — used to recommend new chat when switching patients
+    let patientIdForThisChat = null;
+
+    // --- Observability Tracker (persisted globally — only clears on explicit user action) ---
+    const OBS_STORAGE_KEY = 'agentforge_obs_global';
 
     const obsTracker = {
       requests: 0,
@@ -2682,9 +2686,9 @@
     });
 
     // New Chat button — save current chat, then clear session and start fresh
+    // Observability is not cleared here; only when user explicitly hits Clear
     document.getElementById('new-chat-btn').addEventListener('click', () => {
       saveChatToHistory();
-      localStorage.removeItem(OBS_STORAGE_KEY);
       localStorage.removeItem(SESSION_KEY);
       window.location.reload();
     });
