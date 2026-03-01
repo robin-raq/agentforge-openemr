@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
 
-import { createApp, setSessionHistory, detectInjection, getSessionHistory, loadSessionsFromDisk, schedulePersist, buildChatResponse, validateChatRequest, enforcePatientScope, detectSignals, computeCost, buildStructuredResult } from "../src/server";
+import { createApp, setSessionHistory, detectInjection, getSessionHistory, loadSessionsFromDisk, schedulePersist, buildChatResponse, validateChatRequest, enforcePatientScope, detectSignals, computeCost, buildStructuredResult, extractPatientId } from "../src/server";
 import { getDataSource } from "../src/config";
 import type { ChatResult } from "../src/agent";
 
@@ -891,6 +891,46 @@ describe("server", () => {
       expect(result.sessionId!.length).toBeGreaterThan(0);
       // UUID format check
       expect(result.sessionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+  });
+
+
+  describe("extractPatientId", () => {
+    it("returns undefined when patient_id is missing from body", () => {
+      expect(extractPatientId({})).toBeUndefined();
+    });
+
+    it("returns undefined when patient_id is null", () => {
+      expect(extractPatientId({ patient_id: null })).toBeUndefined();
+    });
+
+    it("returns undefined when patient_id is undefined", () => {
+      expect(extractPatientId({ patient_id: undefined })).toBeUndefined();
+    });
+
+    it("returns undefined when patient_id is a non-string type", () => {
+      expect(extractPatientId({ patient_id: 123 })).toBeUndefined();
+      expect(extractPatientId({ patient_id: true })).toBeUndefined();
+    });
+
+    it("returns undefined when patient_id is empty string", () => {
+      expect(extractPatientId({ patient_id: "" })).toBeUndefined();
+    });
+
+    it("returns undefined when patient_id is whitespace-only", () => {
+      expect(extractPatientId({ patient_id: "   " })).toBeUndefined();
+    });
+
+    it("returns trimmed string patient_id when present and valid", () => {
+      expect(extractPatientId({ patient_id: "1" })).toBe("1");
+      expect(extractPatientId({ patient_id: "42" })).toBe("42");
+      expect(extractPatientId({ patient_id: "  7  " })).toBe("7");
+    });
+
+    it("returns trimmed UUID patient_id when present", () => {
+      const uuid = "90cde167-511f-4f6d-bc97-b65a78cf1995";
+      expect(extractPatientId({ patient_id: uuid })).toBe(uuid);
+      expect(extractPatientId({ patient_id: `  ${uuid}  ` })).toBe(uuid);
     });
   });
 

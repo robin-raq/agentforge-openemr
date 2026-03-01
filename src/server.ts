@@ -363,6 +363,19 @@ export const SESSION_ID_REGEX = /^[\w-]{1,128}$/;
 export const PATIENT_ID_REGEX = /^(\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 export const DOCUMENT_ID_REGEX = /^[a-zA-Z0-9_-]{1,128}$/;
 
+/**
+ * Extract and sanitize patient_id from a request body.
+ * Returns the trimmed patient_id string if present and non-empty, otherwise undefined.
+ */
+export function extractPatientId(body: { patient_id?: unknown }): string | undefined {
+  const { patient_id } = body;
+  if (patient_id && typeof patient_id === "string" && patient_id.trim() !== "") {
+    return patient_id.trim();
+  }
+  return undefined;
+}
+
+
 // Prompt injection detection patterns (exported for testing)
 const INJECTION_PATTERNS = [
   /ignore (?:all |your |previous )?(?:instructions|rules|constraints)/i,
@@ -532,11 +545,12 @@ export function validateChatRequest(
 
   // Patient ID format validation (SEC-002)
   let effectiveMessage = message;
-  if (patient_id && typeof patient_id === "string" && patient_id.trim() !== "") {
-    if (!PATIENT_ID_REGEX.test(patient_id.trim())) {
+  const extractedPid = extractPatientId(body);
+  if (extractedPid !== undefined) {
+    if (!PATIENT_ID_REGEX.test(extractedPid)) {
       return { valid: false, status: 400, error: "Invalid patient_id format." };
     }
-    effectiveMessage = `[Context: Currently viewing patient ${patient_id.trim()}]\n\n${message}`;
+    effectiveMessage = `[Context: Currently viewing patient ${extractedPid}]\n\n${message}`;
   }
 
   // Prompt injection detection (ADV-001)
@@ -678,7 +692,6 @@ export function createApp(): express.Express {
       }
 
       const { sessionId, effectiveMessage } = validation;
-      const { patient_id } = req.body;
       const history = getSessionHistory(sessionId!);
       const callbacks = getLangfuseCallbacks(sessionId!);
 
@@ -686,9 +699,8 @@ export function createApp(): express.Express {
       await flushLangfuse(callbacks);
 
       // SEC-005: Enforce patient scope
-      const patientId = (patient_id && typeof patient_id === "string" && patient_id.trim() !== "")
-        ? patient_id.trim()
-        : undefined;
+      const patientId = extractPatientId(req.body);
+
       enforcePatientScope(result, patientId);
 
       // chat() mutates history with user + assistant messages
@@ -715,7 +727,6 @@ export function createApp(): express.Express {
       }
 
       const { sessionId, effectiveMessage } = validation;
-      const { patient_id } = req.body;
       const history = getSessionHistory(sessionId!);
       const callbacks = getLangfuseCallbacks(sessionId!);
 
@@ -751,9 +762,8 @@ export function createApp(): express.Express {
             const result = event.result;
 
             // SEC-005: Enforce patient scope
-            const patientId = (patient_id && typeof patient_id === "string" && patient_id.trim() !== "")
-              ? patient_id.trim()
-              : undefined;
+            const patientId = extractPatientId(req.body);
+
             enforcePatientScope(result, patientId);
 
             setSessionHistory(sessionId!, history);
