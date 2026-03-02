@@ -1094,7 +1094,8 @@
         // Clean up editor if present
         if (textarea) {
           const contentDiv = bubble.querySelector('.message-content');
-          contentDiv.textContent = textarea.value;
+          contentDiv.innerHTML = renderMarkdown(textarea.value);
+          contentDiv.classList.add('md-rendered');
           contentDiv.style.display = '';
           textarea.remove();
         }
