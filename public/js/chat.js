@@ -1006,9 +1006,10 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
 
-        // Update display with edited content
+        // Update display with edited content (re-render markdown to preserve formatting)
         const contentDiv = bubble.querySelector('.message-content');
-        contentDiv.textContent = newContent;
+        contentDiv.innerHTML = renderMarkdown(newContent);
+        contentDiv.classList.add('md-rendered');
         contentDiv.style.display = '';
         textarea.remove();
 
