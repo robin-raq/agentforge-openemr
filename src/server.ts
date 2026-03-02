@@ -660,6 +660,17 @@ export function createApp(): express.Express {
     });
   });
 
+  // Patient list (for dropdown; supports mock and FHIR)
+  app.get("/api/patients", async (_req, res) => {
+    try {
+      const patients = await dataSource.listPatients();
+      res.json({ patients });
+    } catch (err) {
+      console.error("List patients error:", err);
+      res.status(500).json({ error: "Failed to load patient list" });
+    }
+  });
+
   // List all sessions (for chat history sidebar)
   app.get("/api/sessions", (req, res) => {
     const patient_id = req.query.patient_id as string | undefined;
@@ -967,6 +978,11 @@ export function createApp(): express.Express {
   app.delete("/api/documents/:id", async (req, res) => {
     if (!validateDocumentId(req, res)) return;
     try {
+      const doc = await dataSource.getDocument(req.params.id);
+      if (doc.status === "final") {
+        res.status(400).json({ error: "Cannot delete a finalized document." });
+        return;
+      }
       const result = await dataSource.deleteDocument(req.params.id);
       res.json(result);
     } catch (err) {

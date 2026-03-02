@@ -119,7 +119,7 @@ Open http://localhost:3000 (local) or https://agent-production-6f7a.up.railway.a
 ## Test
 
 ```bash
-npm test       # Run 479 unit tests (Vitest)
+npm test       # Run 484 unit tests (Vitest)
 npm run eval   # Run 125 eval cases (requires ANTHROPIC_API_KEY)
 ```
 
@@ -135,6 +135,19 @@ To use real patient data from OpenEMR:
 6. Restart the server
 
 For iframe embedding from OpenEMR, set `OPENEMR_ORIGINS=https://localhost:8300` (or your OpenEMR origin). The chat UI reads `?pid=` from the URL to auto-select the patient.
+
+### Add Mock Patients from FHIR
+
+To pull patients from OpenEMR FHIR into `mock-data.json` (for demos without FHIR):
+
+```bash
+# Ensure FHIR_* vars are set in .env, then:
+npm run fetch-mock              # Add up to 20 patients (keeps existing 1-4)
+npm run fetch-mock -- --limit 50  # Fetch up to 50
+npm run fetch-mock -- --replace   # Replace mock data entirely
+```
+
+The patient dropdown loads from `GET /api/patients`, which reads from mock data or FHIR depending on `DATA_SOURCE`.
 
 ## Security
 

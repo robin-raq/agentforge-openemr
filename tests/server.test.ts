@@ -24,6 +24,21 @@ describe("server", () => {
     });
   });
 
+  describe("patients endpoint", () => {
+    it("GET /api/patients returns patient list from mock data", async () => {
+      const res = await makeRequest(app, "GET", "/api/patients");
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(Array.isArray(body.patients)).toBe(true);
+      expect(body.patients.length).toBeGreaterThanOrEqual(4);
+      const ids = body.patients.map((p: { id: string }) => p.id);
+      expect(ids).toContain("1");
+      expect(ids).toContain("4");
+      expect(body.patients[0]).toHaveProperty("id");
+      expect(body.patients[0]).toHaveProperty("name");
+    });
+  });
+
   describe("input validation", () => {
     it("rejects body larger than 50kb with 413", async () => {
       const largeMessage = "x".repeat(60_000);
@@ -384,6 +399,23 @@ describe("server", () => {
     it("DELETE /api/documents/:id returns 404 for unknown ID", async () => {
       const res = await makeRequest(app, "DELETE", "/api/documents/doc-nonexistent");
       expect(res.status).toBe(404);
+    });
+
+    it("DELETE /api/documents/:id rejects deletion of finalized documents", async () => {
+      const ds = getDataSource();
+      const doc = await ds.saveDocument({
+        patient_id: "1",
+        encounter_id: "enc-101",
+        type: "discharge_summary",
+        status: "draft",
+        content: "Finalize then delete me",
+        created_by: "ai-agent",
+      });
+      await ds.updateDocument(doc.document_id, { status: "final" });
+      const res = await makeRequest(app, "DELETE", `/api/documents/${doc.document_id}`);
+      expect(res.status).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("finalized");
     });
 
     it("POST /api/documents/:id/finalize accepts optional content to update before finalizing", async () => {

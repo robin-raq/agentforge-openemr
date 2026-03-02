@@ -199,7 +199,7 @@ Agent presents plain-language instructions the patient can understand
 
 ## Technical Stats
 
-- **482 unit tests** passing (TDD throughout, including DailyMed client + discharge instructions tests)
+- **484 unit tests** passing (TDD throughout, including DailyMed client + discharge instructions tests)
 - **125 eval cases** across 28 categories at 87.2% pass rate
 - **10 tools** total (5 original + 5 bounty)
 - **3 server endpoints** for document CRUD
