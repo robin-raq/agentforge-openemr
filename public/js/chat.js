@@ -187,6 +187,7 @@
         }
         if (data) {
           this.responseLog.push({
+            session_id: sessionId,
             tool_calls: data.tool_calls || [],
             timing: data.timing || null,
             verification_flags: data.verification_flags || [],
@@ -1260,6 +1261,16 @@
       var placeholder = createStreamingPlaceholder();
       var contentEl = placeholder.querySelector('.message-content');
       var accumulatedText = '';
+      var renderTimer = null;
+      var renderDirty = false;
+      function throttledRender() {
+        if (renderTimer) return;
+        renderDirty = false;
+        contentEl.innerHTML = renderMarkdown(accumulatedText);
+        contentEl.classList.add('md-rendered');
+        scrollToBottom();
+        renderTimer = setTimeout(function() { renderTimer = null; if (renderDirty) throttledRender(); }, 50);
+      }
 
       var patientId = patientIdForThisChat || patientSelect.value || null;
       obsTracker.lastQuery = msg;
@@ -1298,9 +1309,8 @@
             switch (evt.event) {
               case 'token':
                 accumulatedText += evt.data.content;
-                contentEl.innerHTML = renderMarkdown(accumulatedText);
-                contentEl.classList.add('md-rendered');
-                scrollToBottom();
+                renderDirty = true;
+                throttledRender();
                 break;
               case 'tool_start':
                 addStreamingToolBadge(placeholder, evt.data.tool);
@@ -1310,6 +1320,8 @@
                 break;
               case 'done':
                 gotDone = true;
+                // Cancel any pending render timer
+                if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
                 // Replace placeholder with full verified message
                 placeholder.remove();
                 addMessage('assistant', evt.data.response, evt.data.tool_calls, evt.data.verification_flags, evt.data.timing, evt.data.structured_result, evt.data.reasoning_steps);
@@ -1388,10 +1400,12 @@
         const data = await res.json();
         if (data.messages && data.messages.length > 0) {
           chatContainer.innerHTML = '';
+          // Filter responseLog entries for THIS session only
+          const sessionLog = obsTracker.responseLog.filter(function(e) { return e.session_id === sessionId; });
           let assistantIdx = 0;
           for (const msg of data.messages) {
             if (msg.role === 'assistant') {
-              const meta = obsTracker.responseLog[assistantIdx] || null;
+              const meta = sessionLog[assistantIdx] || null;
               if (meta) {
                 addMessage(msg.role, msg.content, meta.tool_calls, meta.verification_flags, meta.timing, meta.structured_result);
               } else {
