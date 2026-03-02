@@ -117,7 +117,7 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 - The agent rarely exceeds 3 iterations; most queries resolve in 1-2 tool calls (maxIterations: 6)
 - DailyMed API calls add 2-4s when drug education is requested (external HTTP dependency)
 
-**Unit testing:** 232 tests via Vitest covering all tools, data sources, verification logic, server routes, and agent configuration. TDD-driven development throughout.
+**Unit testing:** 479 tests via Vitest covering all tools, data sources, verification logic, server routes, and agent configuration. TDD-driven development throughout.
 
 ---
 
