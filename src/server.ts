@@ -827,9 +827,10 @@ export function createApp(): express.Express {
             setSessionHistory(sessionId!, history);
             evictOldSessions();
             schedulePersist();
-            await flushLangfuse(callbacks);
 
             sendSSE("done", buildChatResponse(result));
+            // Flush Langfuse AFTER sending done event so tracing never blocks the response
+            flushLangfuse(callbacks).catch(() => {});
             break;
           }
           case "error":

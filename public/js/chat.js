@@ -1180,29 +1180,31 @@
 
     function parseSSEBuffer(buffer) {
       var parsed = [];
-      var remaining = '';
-      var currentEvent = null;
-      var currentData = '';
-      var lines = buffer.split('\n');
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        if (line.startsWith('event: ')) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith('data: ')) {
-          currentData = line.slice(6);
-        } else if (line === '') {
-          if (currentEvent && currentData) {
-            try { parsed.push({ event: currentEvent, data: JSON.parse(currentData) }); }
-            catch (e) { /* skip malformed */ }
+      // Split on double-newline (SSE event boundary) to avoid losing data
+      // when a long data: line is split across TCP chunks
+      var blocks = buffer.split('\n\n');
+      // Last element is either empty (buffer ended with \n\n) or an incomplete event
+      var remaining = blocks.pop() || '';
+
+      for (var b = 0; b < blocks.length; b++) {
+        var block = blocks[b].trim();
+        if (!block || block.charAt(0) === ':') continue; // skip empty blocks and comments (keepalive)
+        var currentEvent = null;
+        var currentData = '';
+        var lines = block.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            currentData = line.slice(6);
           }
-          currentEvent = null;
-          currentData = '';
+          // Ignore comments and unknown lines within a block
         }
-      }
-      // Incomplete event stays in buffer
-      if (currentEvent || currentData) {
-        if (currentEvent) remaining += 'event: ' + currentEvent + '\n';
-        if (currentData) remaining += 'data: ' + currentData + '\n';
+        if (currentEvent && currentData) {
+          try { parsed.push({ event: currentEvent, data: JSON.parse(currentData) }); }
+          catch (e) { /* skip malformed */ }
+        }
       }
       return { parsed: parsed, remaining: remaining };
     }
