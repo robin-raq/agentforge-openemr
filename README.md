@@ -34,7 +34,7 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 **Observability:** Langfuse tracing with per-request spans, session grouping, and feedback correlation.
 
-> See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture documentation.
+> See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture documentation.
 
 ## npm Package
 
