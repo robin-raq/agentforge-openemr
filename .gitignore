@@ -34,3 +34,7 @@ npm-debug.log*
 # session persistence (local data)
 data/sessions.json
 data/feedback.json
+
+# internal docs (not for public repo)
+REMEDIATION_PLAN.md
+SECURITY.md
