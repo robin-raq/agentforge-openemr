@@ -335,11 +335,11 @@
 
         // Langfuse link
         const lfContainer = document.getElementById('obs-langfuse-container');
-        if (lastLog && lastLog.structured_result && lastLog.structured_result.trace_id) {
+        if (lfContainer) {
           lfContainer.style.display = 'block';
           const lfLink = document.getElementById('obs-langfuse-link');
-          lfLink.href = 'https://us.cloud.langfuse.com/trace/' + lastLog.structured_result.trace_id;
-        } else if (lfContainer) { lfContainer.style.display = 'none'; }
+          lfLink.href = 'https://us.cloud.langfuse.com/project/cmlzqcecq02urad06gotpc4mp';
+        }
 
         // Performance targets
         this.renderPerformance();
