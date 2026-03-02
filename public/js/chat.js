@@ -1325,7 +1325,15 @@
         if (!gotDone && placeholder.parentElement) {
           placeholder.remove();
           if (accumulatedText) {
-            addMessage('assistant', accumulatedText);
+            // Metadata (confidence, traces) missing — stream was cut off before done event
+            console.warn('[AgentForge] Stream ended without done event — confidence and traces unavailable. Possible causes: proxy timeout (Railway 60s keep-alive), slow connection.');
+            addMessage('assistant', accumulatedText, null, null, null, null, null);
+            // Show subtle note about missing metadata
+            var metaNote = document.createElement('div');
+            metaNote.className = 'meta-unavailable-note';
+            metaNote.innerHTML = '\u2139\uFE0F Confidence and trace data could not be loaded. Try again or check your connection.';
+            chatContainer.appendChild(metaNote);
+            scrollToBottom();
           } else {
             addMessage('assistant', 'Error: Stream ended unexpectedly.');
           }

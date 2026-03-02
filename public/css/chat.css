@@ -452,6 +452,16 @@
       border-left-color: #ef4444;
     }
 
+    .meta-unavailable-note {
+      font-size: 0.8rem;
+      color: #64748b;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
+      background: #f8fafc;
+      border-radius: 6px;
+      border-left: 3px solid #94a3b8;
+    }
+
     .message-timing {
       font-size: 0.7rem;
       color: #94a3b8;

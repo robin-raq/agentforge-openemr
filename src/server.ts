@@ -785,8 +785,14 @@ export function createApp(): express.Express {
         }
       };
 
+      // Railway proxy keep-alive is 60s; send comment every 15s during long tool runs
+      const keepaliveInterval = setInterval(() => {
+        if (!res.destroyed) res.write(": keepalive\n\n");
+      }, 15000);
+
       const stream = chatStream(effectiveMessage!, sessionId!, history, callbacks);
 
+      try {
       for await (const event of stream) {
         if (res.destroyed) break;
 
@@ -830,6 +836,9 @@ export function createApp(): express.Express {
             sendSSE("error", { message: event.message });
             break;
         }
+      }
+      } finally {
+        clearInterval(keepaliveInterval);
       }
     } catch (err) {
       console.error("Stream endpoint error:", err);
