@@ -127,9 +127,11 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 
 **What was released:**
 - Complete LangChain.js clinical agent with 10 tools for OpenEMR
+- `agentforge-agent` npm package — reusable clinical query agent with mock and FHIR data sources
 - DailyMed REST API client for FDA drug labeling data (reusable as standalone module)
 - OpenEMR FHIR R4 data source with OAuth2 authentication
-- Custom eval harness with `--resume`, timing stats, and SVG report generation
+- 125-case eval dataset (`eval/test-cases.json`) covering 25+ clinical query categories — usable as a benchmark for clinical AI agents
+- Custom eval harness with `--resume`, `--sequential`, `--concurrency=N`, timing stats, and SVG report generation
 - OpenEMR custom module (`oe-module-ai-clinical-agent`) for iframe embedding
 - Draft-then-confirm document workflow pattern (applicable to any clinical AI system)
 
