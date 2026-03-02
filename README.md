@@ -136,6 +136,40 @@ To use real patient data from OpenEMR:
 
 For iframe embedding from OpenEMR, set `OPENEMR_ORIGINS=https://localhost:8300` (or your OpenEMR origin). The chat UI reads `?pid=` from the URL to auto-select the patient.
 
+## Security
+
+The agent runs with **mock data by default** — no real PHI is exposed. The following security controls are implemented, along with known limitations for production hardening.
+
+**Implemented Controls:**
+
+| Control | Implementation |
+|---------|---------------|
+| Input validation | Zod schemas on all tool inputs; regex validation on patient IDs, session IDs, document IDs |
+| Rate limiting | 10 req/min per IP with configurable window (`server.ts`) |
+| Prompt injection detection | 10 regex patterns + system prompt reinforcement on detection |
+| Patient scope enforcement | Post-execution verification blocks cross-patient data in responses |
+| Security headers | X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP |
+| CORS | Configurable allowed origins; credentials restricted to explicit origins |
+| Session management | Server-generated UUIDs, auto-cleanup via TTL, max history depth |
+| Secrets protection | `.env` gitignored; placeholder detection warns on unconfigured keys |
+| Content-Type enforcement | POST/PUT require `application/json`; body limited to 50KB |
+| Audit logging | Request logging with patient ID, session, tool usage, safety alerts |
+
+**Known Limitations (MVP — not production-ready):**
+
+| Finding | Severity | Notes |
+|---------|----------|-------|
+| No authentication layer | High | No user auth; relies on network-level access control (OpenEMR iframe) |
+| Document endpoints lack authorization | High | CRUD operations on `/api/documents/:id` have no patient-scope or role checks |
+| Patient scope is post-execution | Medium | Tools execute before scope violation is detected; data accessed but response blocked |
+| Session history persisted in plaintext | Medium | `data/sessions.json` contains chat history unencrypted on disk |
+| TLS verification disabled in dev | Medium | `NODE_TLS_REJECT_UNAUTHORIZED=0` for self-signed certs; must enable in production |
+| CSP allows `unsafe-inline` | Low | Required for current inline JS/CSS; extract to separate files to remove |
+| No CSRF tokens | Medium | State-changing endpoints unprotected; mitigated by CORS origin restriction |
+| Regex-based injection detection | Low | Bypassable via encoding/homoglyphs; defense-in-depth with LLM system prompt |
+
+> **Production checklist:** Add authentication middleware, encrypt session storage, enable TLS verification, add CSRF tokens, implement document-level authorization, move patient scope enforcement before tool execution.
+
 ## Submission Checklist
 
 **Deadline:** Sunday 10:59 PM CT
