@@ -375,6 +375,21 @@ export function extractPatientId(body: { patient_id?: unknown }): string | undef
   return undefined;
 }
 
+/** SEC-007: Audit log for patient data access (HIPAA). Logs to console; replace with proper audit store for production. */
+export function auditLog(event: {
+  action: string;
+  session_id: string;
+  patient_id?: string;
+  tools_called?: string[];
+  ip?: string;
+}): void {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    ...event,
+  };
+  console.log("[AUDIT]", JSON.stringify(entry));
+}
+
 
 // Prompt injection detection patterns (exported for testing)
 const INJECTION_PATTERNS = [
@@ -616,6 +631,12 @@ export function createApp(): express.Express {
   // Security headers
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    const hsts = process.env.HSTS_MAX_AGE;
+    if (hsts) {
+      res.setHeader("Strict-Transport-Security", `max-age=${hsts}; includeSubDomains`);
+    }
     const openEmrOrigins = getOpenEmrOrigins();
     const framePolicy = openEmrOrigins
       ? `frame-ancestors ${openEmrOrigins}`
@@ -703,6 +724,16 @@ export function createApp(): express.Express {
 
       enforcePatientScope(result, patientId);
 
+      if (patientId && result.toolCalls.length > 0) {
+        auditLog({
+          action: "patient_data_access",
+          session_id: sessionId!,
+          patient_id: patientId,
+          tools_called: result.toolCalls.map((t) => t.name),
+          ip: req.ip,
+        });
+      }
+
       // chat() mutates history with user + assistant messages
       setSessionHistory(sessionId!, history);
       evictOldSessions();
@@ -766,6 +797,16 @@ export function createApp(): express.Express {
 
             enforcePatientScope(result, patientId);
 
+            if (patientId && result.toolCalls.length > 0) {
+              auditLog({
+                action: "patient_data_access",
+                session_id: sessionId!,
+                patient_id: patientId,
+                tools_called: result.toolCalls.map((t) => t.name),
+                ip: req.ip,
+              });
+            }
+
             setSessionHistory(sessionId!, history);
             evictOldSessions();
             schedulePersist();
@@ -817,21 +858,43 @@ export function createApp(): express.Express {
     }
   }
 
+  // SEC-008: Feedback endpoint with full input validation
+  const FEEDBACK_COMMENT_MAX = 500;
+  const VALID_RATINGS = new Set(["up", "down"]);
+
   app.post("/api/feedback", (req, res) => {
     const { session_id, message_index, rating, comment } = req.body;
     if (!session_id || typeof session_id !== "string") {
       res.status(400).json({ error: "session_id is required" });
       return;
     }
+    if (!SESSION_ID_REGEX.test(session_id)) {
+      res.status(400).json({ error: "Invalid session_id format." });
+      return;
+    }
     if (!sessionHistory.has(session_id)) {
       res.status(404).json({ error: "Unknown session" });
       return;
     }
+    const mi = message_index;
+    if (mi !== undefined && mi !== null && (typeof mi !== "number" || !Number.isInteger(mi) || mi < 0)) {
+      res.status(400).json({ error: "message_index must be a non-negative integer." });
+      return;
+    }
+    if (rating !== undefined && rating !== null && !VALID_RATINGS.has(String(rating))) {
+      res.status(400).json({ error: "rating must be 'up' or 'down'." });
+      return;
+    }
+    const commentStr = comment != null ? String(comment) : "";
+    if (commentStr.length > FEEDBACK_COMMENT_MAX) {
+      res.status(400).json({ error: `comment must be at most ${FEEDBACK_COMMENT_MAX} characters.` });
+      return;
+    }
     const entry = {
       session_id,
-      message_index,
-      rating,
-      comment: comment || null,
+      message_index: mi == null ? null : Number(mi),
+      rating: rating == null ? null : String(rating),
+      comment: commentStr || null,
       timestamp: new Date().toISOString(),
     };
     console.log("Feedback received:", entry);

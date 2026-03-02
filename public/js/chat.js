@@ -584,8 +584,12 @@
     (function initFromUrl() {
       const params = new URLSearchParams(window.location.search);
       const pid = params.get('pid');
-      if (pid && patientSelect.querySelector('option[value="' + pid + '"]')) {
-        patientSelect.value = pid;
+      // SEC-004: Validate pid and use CSS.escape to prevent DOM XSS via querySelector
+      if (pid && /^[\d\w-]+$/.test(pid)) {
+        const safePid = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(pid) : pid.replace(/["\\]/g, '\\$&');
+        if (patientSelect.querySelector('option[value="' + safePid + '"]')) {
+          patientSelect.value = pid;
+        }
       }
       updatePatientContext();
     })();
@@ -1530,9 +1534,12 @@
     // Restore patient selection from localStorage
     (function restorePatientId() {
       const savedPid = localStorage.getItem(PATIENT_ID_KEY);
-      if (savedPid && patientSelect.querySelector('option[value="' + savedPid + '"]')) {
-        patientSelect.value = savedPid;
-        updatePatientContext();
+      if (savedPid && /^[\d\w-]+$/.test(savedPid)) {
+        const safePid = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(savedPid) : savedPid.replace(/["\\]/g, '\\$&');
+        if (patientSelect.querySelector('option[value="' + safePid + '"]')) {
+          patientSelect.value = savedPid;
+          updatePatientContext();
+        }
       }
     })();
 

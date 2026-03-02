@@ -82,6 +82,28 @@ describe("server", () => {
       }
     });
 
+    it("sets Referrer-Policy and Permissions-Policy", async () => {
+      const res = await makeRequest(app, "GET", "/api/health");
+      expect(res.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+      expect(res.headers["permissions-policy"]).toContain("geolocation=()");
+    });
+
+    it("sets Strict-Transport-Security when HSTS_MAX_AGE is set", async () => {
+      const prev = process.env.HSTS_MAX_AGE;
+      process.env.HSTS_MAX_AGE = "31536000";
+      try {
+        vi.resetModules();
+        const { createApp: createAppWithHsts } = await import("../src/server");
+        const appWithHsts = createAppWithHsts();
+        const res = await makeRequest(appWithHsts, "GET", "/api/health");
+        expect(res.headers["strict-transport-security"]).toContain("max-age=31536000");
+      } finally {
+        if (prev !== undefined) process.env.HSTS_MAX_AGE = prev;
+        else delete process.env.HSTS_MAX_AGE;
+        vi.resetModules();
+      }
+    });
+
     it("sets Content-Security-Policy with script-src and style-src", async () => {
       const res = await makeRequest(app, "GET", "/api/health");
       const csp = res.headers["content-security-policy"];
@@ -236,7 +258,7 @@ describe("server", () => {
   describe("feedback endpoint", () => {
     it("rejects feedback with missing session_id", async () => {
       const res = await makeRequest(app, "POST", "/api/feedback", {
-        rating: "positive",
+        rating: "up",
       });
       expect(res.status).toBe(400);
     });
@@ -244,9 +266,19 @@ describe("server", () => {
     it("rejects feedback for unknown session", async () => {
       const res = await makeRequest(app, "POST", "/api/feedback", {
         session_id: "nonexistent-session",
-        rating: "positive",
+        rating: "up",
       });
       expect(res.status).toBe(404);
+    });
+
+    it("rejects invalid rating", async () => {
+      const sid = "feedback-invalid-rating-" + Date.now();
+      setSessionHistory(sid, [{ role: "user", content: "hello" }]);
+      const res = await makeRequest(app, "POST", "/api/feedback", {
+        session_id: sid,
+        rating: "positive",
+      });
+      expect(res.status).toBe(400);
     });
 
     it("accepts feedback for active session", async () => {
@@ -254,7 +286,7 @@ describe("server", () => {
       setSessionHistory(sid, [{ role: "user", content: "hello" }]);
       const res = await makeRequest(app, "POST", "/api/feedback", {
         session_id: sid,
-        rating: "positive",
+        rating: "up",
       });
       expect(res.status).toBe(200);
     });

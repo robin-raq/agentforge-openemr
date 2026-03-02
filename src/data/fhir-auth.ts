@@ -97,6 +97,12 @@ export class FhirAuthManager {
     this.expiresAt =
       Date.now() + (data.expires_in ?? DEFAULT_EXPIRY_SEC) * 1000;
 
+    // SEC-006: Clear password only after successful refresh — keeps password
+    // available for fallback when refresh fails (e.g. token revoked)
+    if ((this.config as { password?: string }).password) {
+      (this.config as { password?: string }).password = "";
+    }
+
     return this.accessToken;
   }
 
