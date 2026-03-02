@@ -77,6 +77,8 @@ const passRate = ((totalPassed / totalCases) * 100).toFixed(1);
 // Latency stats
 const durations = results.filter((r) => r.duration_ms > 0).map((r) => r.duration_ms).sort((a, b) => a - b);
 const avgLatency = durations.length > 0 ? (durations.reduce((s, d) => s + d, 0) / durations.length / 1000).toFixed(1) : "N/A";
+const p50Latency = durations.length > 0 ? (durations[Math.floor(durations.length * 0.5)] / 1000).toFixed(1) : "N/A";
+const p95Latency = durations.length > 0 ? (durations[Math.floor(durations.length * 0.95)] / 1000).toFixed(1) : "N/A";
 
 const width = 900;
 const rowHeight = 32;
@@ -128,13 +130,13 @@ let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${he
 
   <!-- Metrics row -->
   <rect x="40" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
-  <text x="120" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">232 Unit Tests ✅</text>
+  <text x="120" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">479 Unit Tests ✅</text>
   <rect x="210" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
   <text x="290" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">${tools.length} Tools Covered ✅</text>
   <rect x="380" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
   <text x="460" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">${totalCases} Eval Cases ✅</text>
   <rect x="550" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
-  <text x="630" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">Avg ${avgLatency}s/query</text>
+  <text x="630" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">p50 ${p50Latency}s · p95 ${p95Latency}s</text>
 `;
 
 // Category section
@@ -194,10 +196,11 @@ const md = `# AgentForge Eval Results
 
 ## Summary
 - **Pass Rate:** ${passRate}% (${totalPassed}/${totalCases})
-- **Unit Tests:** 232 passing
+- **Unit Tests:** 479 passing
 - **Tools Covered:** ${tools.length}/10
 - **Eval Cases:** ${totalCases}
-- **Avg Latency:** ${avgLatency}s/query
+- **p50 Latency:** ${p50Latency}s
+- **p95 Latency:** ${p95Latency}s
 
 ## Category Breakdown
 | Category | Passed | Total | Rate |

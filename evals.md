@@ -4,6 +4,49 @@
 
 Evals validate that the clinical query agent produces correct, safe, and well-routed responses. The dataset uses two complementary eval types:
 
+## Evaluation Framework Compliance
+
+Production agents require systematic evaluation. This framework covers all required eval types:
+
+| Eval Type | What We Test | How |
+|-----------|--------------|-----|
+| **Correctness** | Agent returns accurate information; fact-check against ground truth | `must_contain` / `must_not_contain` — keywords from mock data (e.g. "Warfarin", "Lisinopril" for patient 1 meds) |
+| **Tool Selection** | Agent chooses the right tool for each query | `expected_tools` + `checkTools()` |
+| **Tool Execution** | Tool calls succeed; parameters correct | Success inferred from response; `patient_id` in tool args validated when `patient_id` in test case |
+| **Safety** | Agent refuses harmful requests; avoids hallucination | `must_not_contain` (e.g. "safe to prescribe"), `checkNoToolsCalled` for adversarial, safety alerts |
+| **Consistency** | Same input → same output where expected | `consistency_runs` + `consistency_keywords` — run query N times, assert keywords in ALL runs |
+| **Edge Cases** | Missing data, invalid input, ambiguous queries | `edge_case`, `out_of_domain`, `ambiguous` categories; invalid patient IDs, empty data |
+| **Latency** | Response time within bounds | `max_latency_ms` per case; suite targets: single-tool &lt;5s, multi-step &lt;15s |
+
+### Eval Dataset Requirements (Met)
+
+| Requirement | Minimum | Actual |
+|-------------|---------|--------|
+| Total test cases | 50 | 125 |
+| Happy path | 20+ | 50+ (golden_set, query_variation, drug_interactions, complex_query, bounty) |
+| Edge cases | 10+ | 24+ (edge_case, bounty_edge, bounty_encounter, appointments, ambiguous, typo_resilience) |
+| Adversarial | 10+ | 26+ (adversarial, out_of_domain) |
+| Multi-step | 10+ | 19+ (multi_tool, workflow, multi_turn_chain, bounty workflows) |
+
+### Test Case Schema (per requirement)
+
+Each test case includes:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `query` | yes | Input query (or `turns` for multi-turn) |
+| `expected_tools` | yes | Tool(s) agent should call; `[]` = no tools (adversarial) |
+| `must_contain` | yes | Keywords that MUST appear (expected output / correctness) |
+| `must_not_contain` | yes | Keywords that must NOT appear (pass/fail criteria) |
+| `patient_id` | no | Patient context (injected as `[Context: Currently viewing patient X]`) |
+| `max_latency_ms` | no | Per-case latency bound |
+| `consistency_runs` | no | Run same query N times for consistency |
+| `consistency_keywords` | no | Keywords that must appear in ALL runs |
+
+---
+
+### Eval Types
+
 - **Golden Sets** define what "correct" looks like. If these fail, something is fundamentally broken.
 - **Labeled Scenarios** are golden sets with tags. The tags don't change how the test runs — they change what the results tell you.
 

@@ -3,6 +3,7 @@ dotenv.config({ override: true });
 import * as fs from "fs";
 import * as path from "path";
 import { chat } from "../src/agent";
+import { PATIENT_TOOLS } from "../src/constants";
 import { scoreWithRubric, checkQualityGate, QUALITY_THRESHOLDS } from "./rubric-judge";
 import type { RubricResult } from "./rubric-judge";
 
@@ -317,12 +318,21 @@ async function runEval() {
     duration_ms: number;
   }
 
+  /** Build message with patient context when patient_id is in test case (matches production). */
+  function buildMessage(query: string, patientId?: string): string {
+    if (patientId && patientId.trim() !== "") {
+      return `[Context: Currently viewing patient ${patientId.trim()}]\n\n${query}`;
+    }
+    return query;
+  }
+
   // ── Execution Helper: Single-turn ──
   async function runSingleTurn(
     tc: TestCase,
     start: number,
   ): Promise<ExecutionOutput> {
-    const result = await chat(tc.query!, `eval-${tc.id}`, []);
+    const message = buildMessage(tc.query!, tc.patient_id);
+    const result = await chat(message, `eval-${tc.id}`, []);
     const toolsUsed = result.toolCalls.map((t) => t.name);
     const duration_ms = Date.now() - start;
     return { result, toolsUsed, duration_ms };
@@ -338,8 +348,9 @@ async function runEval() {
 
     for (let i = 0; i < tc.turns!.length; i++) {
       const turn = tc.turns![i];
+      const message = buildMessage(turn.query, turn.patient_id ?? tc.patient_id);
       const sessionId = `eval-${tc.id}-turn${i}`;
-      result = await chat(turn.query, sessionId, history);
+      result = await chat(message, sessionId, history);
       if (i < tc.turns!.length - 1 && verbose) {
         console.log(`   Turn ${i + 1}/${tc.turns!.length}: "${turn.query.slice(0, 60)}..." → ${result.toolCalls.length} tools`);
       }
@@ -359,8 +370,9 @@ async function runEval() {
     const runResults: string[] = [];
     let result!: Awaited<ReturnType<typeof chat>>;
 
+    const message = buildMessage(tc.query!, tc.patient_id);
     for (let i = 0; i < tc.consistency_runs!; i++) {
-      const runResult = await chat(tc.query!, `eval-${tc.id}-run${i}`, []);
+      const runResult = await chat(message, `eval-${tc.id}-run${i}`, []);
       runResults.push(runResult.response);
       if (i === 0) {
         result = runResult; // Use first run for standard assertions
@@ -438,6 +450,20 @@ async function runEval() {
     // 5. Check latency assertion
     if (tc.max_latency_ms && duration_ms > tc.max_latency_ms) {
       failures.push(`latency ${duration_ms}ms exceeds max ${tc.max_latency_ms}ms`);
+    }
+
+    // 6. Tool execution: when patient_id in test case, verify patient-scoped tools used correct patient_id
+    if (tc.patient_id && result.toolCalls) {
+      const patientToolsCalled = result.toolCalls.filter((t) => PATIENT_TOOLS.has(t.name));
+      const wrongPatient = patientToolsCalled.find((t) => {
+        const args = t.args as Record<string, unknown>;
+        const pid = args?.patient_id;
+        return pid !== undefined && String(pid) !== String(tc.patient_id);
+      });
+      if (wrongPatient) {
+        const args = wrongPatient.args as Record<string, unknown>;
+        failures.push(`tool ${wrongPatient.name} called with patient_id=${args?.patient_id} (expected ${tc.patient_id})`);
+      }
     }
 
     // ── Verification Metrics ──

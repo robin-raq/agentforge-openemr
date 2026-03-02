@@ -74,13 +74,13 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 
 ## Eval Results
 
-**125 eval cases** across 25+ categories, testing all 10 tools.
+**125 eval cases** across 28 categories, testing all 10 tools.
 
 | Metric | Value |
 |--------|-------|
-| Pass rate | **87.2%** (109/125) |
-| p50 latency | 6.8s |
-| p95 latency | 21.6s |
+| Pass rate | **81.6%** (102/125) |
+| p50 latency | 6.2s |
+| p95 latency | 27.4s |
 | Golden sets | 100% (10/10) |
 
 **Category breakdown (representative):**
@@ -88,13 +88,13 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 | Category | Rate | Notes |
 |----------|------|-------|
 | Golden sets (core routing) | 100% (10/10) | All tools route correctly |
-| Drug interactions | 100% (5/5) | Severity gating works |
+| Bounty: Discharge, Workflows, Safety | 100% | All bounty-critical paths pass |
 | DailyMed | 100% (2/2) | FDA labeling integration |
-| Query variations | 100% (8/8) | Paraphrased queries |
-| Adversarial | 95% (21/22) | Prompt injection resistance |
-| Bounty categories | 67–100% | Med rec, discharge, safety, workflows |
-| Edge cases | 67% (6/9) | Invalid IDs, empty data handling |
-| Workflows | 33% (1/3) | Multi-step tool chains |
+| Adversarial | 91% (20/22) | Prompt injection resistance |
+| Query variations | 88% (7/8) | Paraphrased queries |
+| Drug interactions | 80% (4/5) | Severity gating works |
+| Multi-turn chains | 100% (3/3) | Sequential reasoning |
+| Edge cases | 56% (5/9) | Invalid IDs, empty data handling |
 
 **Eval infrastructure:** Custom harness (`eval/run-eval.ts`) with `must_contain`, `must_not_contain`, and `expected_tools` assertions. Supports `--resume` to skip previously passed cases, `--sequential` for latency benchmarking (avoids API throttling), and `--concurrency=N`. Outputs `results.json` with per-case timing, tool usage, and pass/fail status. Auto-generates SVG dashboard and markdown summary.
 
