@@ -136,10 +136,6 @@ To use real patient data from OpenEMR:
 
 For iframe embedding from OpenEMR, set `OPENEMR_ORIGINS=https://localhost:8300` (or your OpenEMR origin). The chat UI reads `?pid=` from the URL to auto-select the patient.
 
-## Security
-
-See [SECURITY.md](SECURITY.md) for the full security audit and remediation checklist. The current MVP runs with mock data — all identified issues must be resolved before connecting to real patient data.
-
 ## Submission Checklist
 
 **Deadline:** Sunday 10:59 PM CT
