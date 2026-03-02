@@ -155,20 +155,7 @@ The agent runs with **mock data by default** — no real PHI is exposed. The fol
 | Content-Type enforcement | POST/PUT require `application/json`; body limited to 50KB |
 | Audit logging | Request logging with patient ID, session, tool usage, safety alerts |
 
-**Known Limitations (MVP — not production-ready):**
-
-| Finding | Severity | Notes |
-|---------|----------|-------|
-| No authentication layer | High | No user auth; relies on network-level access control (OpenEMR iframe) |
-| Document endpoints lack authorization | High | CRUD operations on `/api/documents/:id` have no patient-scope or role checks |
-| Patient scope is post-execution | Medium | Tools execute before scope violation is detected; data accessed but response blocked |
-| Session history persisted in plaintext | Medium | `data/sessions.json` contains chat history unencrypted on disk |
-| TLS verification disabled in dev | Medium | `NODE_TLS_REJECT_UNAUTHORIZED=0` for self-signed certs; must enable in production |
-| CSP allows `unsafe-inline` | Low | Required for current inline JS/CSS; extract to separate files to remove |
-| No CSRF tokens | Medium | State-changing endpoints unprotected; mitigated by CORS origin restriction |
-| Regex-based injection detection | Low | Bypassable via encoding/homoglyphs; defense-in-depth with LLM system prompt |
-
-> **Production checklist:** Add authentication middleware, encrypt session storage, enable TLS verification, add CSRF tokens, implement document-level authorization, move patient scope enforcement before tool execution.
+See [FUTURE_WORK.md](FUTURE_WORK.md) for known limitations, security hardening roadmap, and planned improvements.
 
 ## Submission Checklist
 
