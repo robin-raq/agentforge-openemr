@@ -140,6 +140,11 @@ Agent presents plain-language instructions the patient can understand
 - **HIPAA-compatible**: Draft-then-confirm pattern means AI assists but doesn't make clinical decisions
 - **Integrated**: Works within the OpenEMR workflow via FHIR R4 API + DailyMed API
 
+## Open Source Contributions
+
+- [`agentforge-clinical-agent`](https://www.npmjs.com/package/agentforge-clinical-agent) — published npm package for the clinical query agent, reusable with mock or FHIR data sources
+- **125-case eval dataset** (`eval/test-cases.json`) — 25+ categories covering clinical queries, adversarial prompts, edge cases, and bounty-specific workflows; usable as a benchmark for clinical AI agents
+
 ## Technical Stats
 
 - **479 unit tests** passing (including DailyMed client tests + discharge instructions tests)
