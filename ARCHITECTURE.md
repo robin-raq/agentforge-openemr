@@ -17,7 +17,7 @@
 
 ## Agent Architecture
 
-![Architecture Diagram](architecture-diagram.svg)
+![Architecture Diagram](docs/architecture-diagram.svg)
 
 **Framework:** LangChain.js with `createToolCallingAgent` and `AgentExecutor`. Chosen for native Claude tool-calling support, built-in iteration control (max 6), conversation history management, and callback-based observability hooks.
 
