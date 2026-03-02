@@ -177,14 +177,14 @@ The agent runs with **mock data by default** — no real PHI is exposed. The fol
 | Deliverable | Status | Link |
 |-------------|--------|------|
 | GitHub Repository | :white_check_mark: Setup guide, architecture overview, deployed link | [repo](https://github.com/robin-raq/agentforge-openemr) |
-| Demo Video (3-5 min) | :x: Agent in action, eval results, observability dashboard | — |
+| Demo Video (3-5 min) | :white_check_mark: Agent in action, eval results, observability dashboard | Submitted |
 | Pre-Search Document | :white_check_mark: Completed checklist from Phase 1-3 | Submitted |
 | Agent Architecture Doc | :white_check_mark: 1-2 page breakdown | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | AI Cost Analysis | :white_check_mark: Dev spend + projections for 100/1K/10K/100K users | [AI_COST_ANALYSIS.md](AI_COST_ANALYSIS.md) |
 | Eval Dataset | :white_check_mark: 125 test cases with results (87.2% pass rate) | [eval/test-cases.json](eval/test-cases.json) \| [results](docs/eval-results.md) |
 | Open Source Link | :white_check_mark: Published npm package | [agentforge-clinical-agent](https://www.npmjs.com/package/agentforge-clinical-agent) |
 | Deployed Application | :white_check_mark: Publicly accessible agent interface | [Railway](https://agent-production-6f7a.up.railway.app) |
-| Social Post | :x: Share on X or LinkedIn — description, features, demo/screenshots, tag @GauntletAI | — |
+| Social Post | :white_check_mark: Shared on LinkedIn | Submitted |
 
 ## MVP Requirements
 
