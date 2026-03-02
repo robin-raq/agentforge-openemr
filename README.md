@@ -184,6 +184,7 @@ The agent runs with **mock data by default** — no real PHI is exposed. The fol
 | Eval Dataset | :white_check_mark: 125 test cases with results (87.2% pass rate) | [eval/test-cases.json](eval/test-cases.json) \| [results](docs/eval-results.md) |
 | Open Source Link | :white_check_mark: Published npm package | [agentforge-clinical-agent](https://www.npmjs.com/package/agentforge-clinical-agent) |
 | Deployed Application | :white_check_mark: Publicly accessible agent interface | [Railway](https://agent-production-6f7a.up.railway.app) |
+| Evaluation Framework | :white_check_mark: Correctness, tool selection, safety, adversarial, edge cases | [evals.md](evals.md) |
 | Social Post | :white_check_mark: Shared on LinkedIn | Submitted |
 
 ## MVP Requirements
