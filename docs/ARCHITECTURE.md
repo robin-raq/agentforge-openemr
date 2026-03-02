@@ -78,9 +78,9 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 
 | Metric | Value |
 |--------|-------|
-| Pass rate | **81.6%** (102/125) |
+| Pass rate | **87.2%** (109/125) |
 | p50 latency | 6.2s |
-| p95 latency | 27.4s |
+| p95 latency | 28.4s |
 | Golden sets | 100% (10/10) |
 
 **Category breakdown (representative):**
@@ -94,7 +94,7 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 | Query variations | 88% (7/8) | Paraphrased queries |
 | Drug interactions | 80% (4/5) | Severity gating works |
 | Multi-turn chains | 100% (3/3) | Sequential reasoning |
-| Edge cases | 56% (5/9) | Invalid IDs, empty data handling |
+| Edge cases | 67% (6/9) | Invalid IDs, empty data handling |
 
 **Eval infrastructure:** Custom harness (`eval/run-eval.ts`) with `must_contain`, `must_not_contain`, and `expected_tools` assertions. Supports `--resume` to skip previously passed cases, `--sequential` for latency benchmarking (avoids API throttling), and `--concurrency=N`. Outputs `results.json` with per-case timing, tool usage, and pass/fail status. Auto-generates SVG dashboard and markdown summary.
 

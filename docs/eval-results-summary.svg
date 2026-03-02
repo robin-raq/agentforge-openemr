@@ -35,8 +35,8 @@
 
   <!-- Pass rate badge -->
   <rect x="700" y="20" width="160" height="60" rx="10" fill="#052e16" stroke="#22c55e" stroke-width="1.5"/>
-  <text x="780" y="46" font-size="28" font-weight="700" fill="#22c55e" text-anchor="middle">81.6%</text>
-  <text x="780" y="66" font-size="12" fill="#86efac" text-anchor="middle">102/125 passed</text>
+  <text x="780" y="46" font-size="28" font-weight="700" fill="#22c55e" text-anchor="middle">87.2%</text>
+  <text x="780" y="66" font-size="12" fill="#86efac" text-anchor="middle">109/125 passed</text>
 
   <!-- Metrics row -->
   <rect x="40" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
@@ -46,7 +46,7 @@
   <rect x="380" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
   <text x="460" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">125 Eval Cases ✅</text>
   <rect x="550" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
-  <text x="630" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">p50 6.2s · p95 27.4s</text>
+  <text x="630" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">p50 6.2s · p95 28.4s</text>
 <text x="40" y="130" font-size="16" font-weight="600" fill="#e2e8f0">Category Breakdown</text>
   <text x="40" y="175" font-size="13" fill="#cbd5e1">Golden Sets</text>
   <rect x="230" y="161" width="350" height="18" rx="4" fill="#334155"/>
@@ -60,9 +60,9 @@
   <text x="660" y="207" font-size="13" fill="#fca5a5" font-weight="600">60%</text>
   <text x="40" y="239" font-size="13" fill="#cbd5e1">Edge Cases</text>
   <rect x="230" y="225" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="225" width="194.44444444444446" height="18" rx="4" fill="url(#red-bar)"/>
-  <text x="590" y="239" font-size="13" fill="#94a3b8">5/9</text>
-  <text x="660" y="239" font-size="13" fill="#fca5a5" font-weight="600">56%</text>
+  <rect x="230" y="225" width="233.33333333333331" height="18" rx="4" fill="url(#red-bar)"/>
+  <text x="590" y="239" font-size="13" fill="#94a3b8">6/9</text>
+  <text x="660" y="239" font-size="13" fill="#fca5a5" font-weight="600">67%</text>
   <text x="40" y="271" font-size="13" fill="#cbd5e1">Adversarial</text>
   <rect x="230" y="257" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="257" width="318.1818181818182" height="18" rx="4" fill="url(#green-bar)"/>
@@ -70,9 +70,9 @@
   <text x="660" y="271" font-size="13" fill="#86efac" font-weight="600">91%</text>
   <text x="40" y="303" font-size="13" fill="#cbd5e1">Safety</text>
   <rect x="230" y="289" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="289" width="200" height="18" rx="4" fill="url(#red-bar)"/>
-  <text x="590" y="303" font-size="13" fill="#94a3b8">4/7</text>
-  <text x="660" y="303" font-size="13" fill="#fca5a5" font-weight="600">57%</text>
+  <rect x="230" y="289" width="300" height="18" rx="4" fill="url(#yellow-bar)"/>
+  <text x="590" y="303" font-size="13" fill="#94a3b8">6/7</text>
+  <text x="660" y="303" font-size="13" fill="#fde047" font-weight="600">86%</text>
   <text x="40" y="335" font-size="13" fill="#cbd5e1">Query Variation</text>
   <rect x="230" y="321" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="321" width="306.25" height="18" rx="4" fill="url(#yellow-bar)"/>
@@ -90,9 +90,9 @@
   <text x="660" y="399" font-size="13" fill="#fca5a5" font-weight="600">50%</text>
   <text x="40" y="431" font-size="13" fill="#cbd5e1">Bounty: Encounters</text>
   <rect x="230" y="417" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="417" width="233.33333333333331" height="18" rx="4" fill="url(#red-bar)"/>
-  <text x="590" y="431" font-size="13" fill="#94a3b8">2/3</text>
-  <text x="660" y="431" font-size="13" fill="#fca5a5" font-weight="600">67%</text>
+  <rect x="230" y="417" width="350" height="18" rx="4" fill="url(#green-bar)"/>
+  <text x="590" y="431" font-size="13" fill="#94a3b8">3/3</text>
+  <text x="660" y="431" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="463" font-size="13" fill="#cbd5e1">Bounty: Med Rec</text>
   <rect x="230" y="449" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="449" width="175" height="18" rx="4" fill="url(#red-bar)"/>
@@ -110,9 +110,9 @@
   <text x="660" y="527" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="559" font-size="13" fill="#cbd5e1">Bounty: Edge Cases</text>
   <rect x="230" y="545" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="545" width="4" height="18" rx="4" fill="url(#red-bar)"/>
-  <text x="590" y="559" font-size="13" fill="#94a3b8">0/1</text>
-  <text x="660" y="559" font-size="13" fill="#fca5a5" font-weight="600">0%</text>
+  <rect x="230" y="545" width="350" height="18" rx="4" fill="url(#green-bar)"/>
+  <text x="590" y="559" font-size="13" fill="#94a3b8">1/1</text>
+  <text x="660" y="559" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="591" font-size="13" fill="#cbd5e1">Bounty: Safety</text>
   <rect x="230" y="577" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="577" width="350" height="18" rx="4" fill="url(#green-bar)"/>
@@ -120,14 +120,14 @@
   <text x="660" y="591" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="623" font-size="13" fill="#cbd5e1">Discharge Instr.</text>
   <rect x="230" y="609" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="609" width="262.5" height="18" rx="4" fill="url(#yellow-bar)"/>
-  <text x="590" y="623" font-size="13" fill="#94a3b8">3/4</text>
-  <text x="660" y="623" font-size="13" fill="#fde047" font-weight="600">75%</text>
+  <rect x="230" y="609" width="350" height="18" rx="4" fill="url(#green-bar)"/>
+  <text x="590" y="623" font-size="13" fill="#94a3b8">4/4</text>
+  <text x="660" y="623" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="655" font-size="13" fill="#cbd5e1">Appointments</text>
   <rect x="230" y="641" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="641" width="233.33333333333331" height="18" rx="4" fill="url(#red-bar)"/>
-  <text x="590" y="655" font-size="13" fill="#94a3b8">2/3</text>
-  <text x="660" y="655" font-size="13" fill="#fca5a5" font-weight="600">67%</text>
+  <rect x="230" y="641" width="350" height="18" rx="4" fill="url(#green-bar)"/>
+  <text x="590" y="655" font-size="13" fill="#94a3b8">3/3</text>
+  <text x="660" y="655" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="687" font-size="13" fill="#cbd5e1">DailyMed</text>
   <rect x="230" y="673" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="673" width="350" height="18" rx="4" fill="url(#green-bar)"/>
@@ -145,9 +145,9 @@
   <text x="660" y="751" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="783" font-size="13" fill="#cbd5e1">typo_resilience</text>
   <rect x="230" y="769" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="769" width="350" height="18" rx="4" fill="url(#green-bar)"/>
-  <text x="590" y="783" font-size="13" fill="#94a3b8">3/3</text>
-  <text x="660" y="783" font-size="13" fill="#86efac" font-weight="600">100%</text>
+  <rect x="230" y="769" width="233.33333333333331" height="18" rx="4" fill="url(#red-bar)"/>
+  <text x="590" y="783" font-size="13" fill="#94a3b8">2/3</text>
+  <text x="660" y="783" font-size="13" fill="#fca5a5" font-weight="600">67%</text>
   <text x="40" y="815" font-size="13" fill="#cbd5e1">out_of_domain</text>
   <rect x="230" y="801" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="801" width="262.5" height="18" rx="4" fill="url(#yellow-bar)"/>
@@ -155,9 +155,9 @@
   <text x="660" y="815" font-size="13" fill="#fde047" font-weight="600">75%</text>
   <text x="40" y="847" font-size="13" fill="#cbd5e1">phi_boundary</text>
   <rect x="230" y="833" width="350" height="18" rx="4" fill="#334155"/>
-  <rect x="230" y="833" width="233.33333333333331" height="18" rx="4" fill="url(#red-bar)"/>
-  <text x="590" y="847" font-size="13" fill="#94a3b8">2/3</text>
-  <text x="660" y="847" font-size="13" fill="#fca5a5" font-weight="600">67%</text>
+  <rect x="230" y="833" width="350" height="18" rx="4" fill="url(#green-bar)"/>
+  <text x="590" y="847" font-size="13" fill="#94a3b8">3/3</text>
+  <text x="660" y="847" font-size="13" fill="#86efac" font-weight="600">100%</text>
   <text x="40" y="879" font-size="13" fill="#cbd5e1">knowledge_boundary</text>
   <rect x="230" y="865" width="350" height="18" rx="4" fill="#334155"/>
   <rect x="230" y="865" width="350" height="18" rx="4" fill="url(#green-bar)"/>
@@ -191,42 +191,42 @@
   <text x="40" y="1126" font-size="12" fill="#cbd5e1" font-family="monospace">get_patient_summary</text>
   <rect x="310" y="1112" width="270" height="18" rx="4" fill="#334155"/>
   <rect x="310" y="1112" width="270" height="18" rx="4" fill="url(#blue-bar)"/>
-  <text x="590" y="1126" font-size="13" fill="#93c5fd" font-weight="600">23 calls</text>
+  <text x="590" y="1126" font-size="13" fill="#93c5fd" font-weight="600">26 calls</text>
   <text x="40" y="1158" font-size="12" fill="#cbd5e1" font-family="monospace">get_encounter_data</text>
   <rect x="310" y="1144" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1144" width="234.78260869565216" height="18" rx="4" fill="url(#blue-bar)"/>
-  <text x="590" y="1158" font-size="13" fill="#93c5fd" font-weight="600">20 calls</text>
+  <rect x="310" y="1144" width="228.46153846153845" height="18" rx="4" fill="url(#blue-bar)"/>
+  <text x="590" y="1158" font-size="13" fill="#93c5fd" font-weight="600">22 calls</text>
   <text x="40" y="1190" font-size="12" fill="#cbd5e1" font-family="monospace">drug_interaction_check</text>
   <rect x="310" y="1176" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1176" width="199.56521739130434" height="18" rx="4" fill="url(#blue-bar)"/>
-  <text x="590" y="1190" font-size="13" fill="#93c5fd" font-weight="600">17 calls</text>
+  <rect x="310" y="1176" width="186.9230769230769" height="18" rx="4" fill="url(#blue-bar)"/>
+  <text x="590" y="1190" font-size="13" fill="#93c5fd" font-weight="600">18 calls</text>
   <text x="40" y="1222" font-size="12" fill="#cbd5e1" font-family="monospace">get_lab_results</text>
   <rect x="310" y="1208" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1208" width="199.56521739130434" height="18" rx="4" fill="url(#blue-bar)"/>
+  <rect x="310" y="1208" width="176.53846153846155" height="18" rx="4" fill="url(#blue-bar)"/>
   <text x="590" y="1222" font-size="13" fill="#93c5fd" font-weight="600">17 calls</text>
-  <text x="40" y="1254" font-size="12" fill="#cbd5e1" font-family="monospace">save_to_chart</text>
+  <text x="40" y="1254" font-size="12" fill="#cbd5e1" font-family="monospace">get_medications</text>
   <rect x="310" y="1240" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1240" width="176.08695652173913" height="18" rx="4" fill="url(#blue-bar)"/>
+  <rect x="310" y="1240" width="155.76923076923075" height="18" rx="4" fill="url(#blue-bar)"/>
   <text x="590" y="1254" font-size="13" fill="#93c5fd" font-weight="600">15 calls</text>
-  <text x="40" y="1286" font-size="12" fill="#cbd5e1" font-family="monospace">get_medications</text>
+  <text x="40" y="1286" font-size="12" fill="#cbd5e1" font-family="monospace">save_to_chart</text>
   <rect x="310" y="1272" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1272" width="164.34782608695653" height="18" rx="4" fill="url(#blue-bar)"/>
-  <text x="590" y="1286" font-size="13" fill="#93c5fd" font-weight="600">14 calls</text>
-  <text x="40" y="1318" font-size="12" fill="#cbd5e1" font-family="monospace">generate_discharge_instructions</text>
+  <rect x="310" y="1272" width="155.76923076923075" height="18" rx="4" fill="url(#blue-bar)"/>
+  <text x="590" y="1286" font-size="13" fill="#93c5fd" font-weight="600">15 calls</text>
+  <text x="40" y="1318" font-size="12" fill="#cbd5e1" font-family="monospace">allergy_check</text>
   <rect x="310" y="1304" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1304" width="93.91304347826086" height="18" rx="4" fill="url(#blue-bar)"/>
+  <rect x="310" y="1304" width="83.07692307692308" height="18" rx="4" fill="url(#blue-bar)"/>
   <text x="590" y="1318" font-size="13" fill="#93c5fd" font-weight="600">8 calls</text>
-  <text x="40" y="1350" font-size="12" fill="#cbd5e1" font-family="monospace">allergy_check</text>
+  <text x="40" y="1350" font-size="12" fill="#cbd5e1" font-family="monospace">generate_discharge_instructions</text>
   <rect x="310" y="1336" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1336" width="70.43478260869566" height="18" rx="4" fill="url(#blue-bar)"/>
-  <text x="590" y="1350" font-size="13" fill="#93c5fd" font-weight="600">6 calls</text>
+  <rect x="310" y="1336" width="83.07692307692308" height="18" rx="4" fill="url(#blue-bar)"/>
+  <text x="590" y="1350" font-size="13" fill="#93c5fd" font-weight="600">8 calls</text>
   <text x="40" y="1382" font-size="12" fill="#cbd5e1" font-family="monospace">reconcile_medications</text>
   <rect x="310" y="1368" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1368" width="58.69565217391304" height="18" rx="4" fill="url(#blue-bar)"/>
+  <rect x="310" y="1368" width="51.92307692307693" height="18" rx="4" fill="url(#blue-bar)"/>
   <text x="590" y="1382" font-size="13" fill="#93c5fd" font-weight="600">5 calls</text>
   <text x="40" y="1414" font-size="12" fill="#cbd5e1" font-family="monospace">draft_discharge_summary</text>
   <rect x="310" y="1400" width="270" height="18" rx="4" fill="#334155"/>
-  <rect x="310" y="1400" width="46.95652173913043" height="18" rx="4" fill="url(#blue-bar)"/>
+  <rect x="310" y="1400" width="41.53846153846154" height="18" rx="4" fill="url(#blue-bar)"/>
   <text x="590" y="1414" font-size="13" fill="#93c5fd" font-weight="600">4 calls</text>
   <line x1="40" y1="1446" x2="860" y2="1446" stroke="#334155" stroke-width="1"/>
   <text x="40" y="1471" font-size="12" fill="#64748b">Generated 2026-03-02 • LangChain.js + Claude Sonnet 4 • Vitest + Custom Eval Harness</text>

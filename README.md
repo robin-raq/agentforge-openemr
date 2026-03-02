@@ -44,35 +44,36 @@ Available on npm: [`agentforge-clinical-agent`](https://www.npmjs.com/package/ag
 
 ![Eval Results](docs/eval-results-summary.svg)
 
-**125 eval cases** across 28 categories — **81.6% pass rate** (102/125) on all 10 tools. p50 latency: 6.2s, p95: 27.4s.
+**125 eval cases** across 28 categories — **87.2% pass rate** (109/125) on all 10 tools. p50 latency: 6.2s, p95: 28.4s.
 
 | Category | Passed | Total | Rate |
 |----------|--------|-------|------|
 | Golden Sets | 10 | 10 | 100% |
+| Bounty: Encounters | 3 | 3 | 100% |
 | Bounty: Discharge | 2 | 2 | 100% |
 | Bounty: Workflows | 2 | 2 | 100% |
+| Bounty: Edge Cases | 1 | 1 | 100% |
 | Bounty: Safety | 2 | 2 | 100% |
+| Bounty: Discharge Instr. | 4 | 4 | 100% |
+| Appointments | 3 | 3 | 100% |
 | DailyMed | 2 | 2 | 100% |
 | Workflows | 3 | 3 | 100% |
 | Ambiguous | 4 | 4 | 100% |
-| Typo Resilience | 3 | 3 | 100% |
 | Knowledge Boundary | 3 | 3 | 100% |
 | Multi-Turn Chain | 3 | 3 | 100% |
 | Robustness | 3 | 3 | 100% |
 | Consistency | 2 | 2 | 100% |
 | Latency | 3 | 3 | 100% |
+| PHI Boundary | 3 | 3 | 100% |
 | Adversarial | 20 | 22 | 91% |
 | Query Variation | 7 | 8 | 88% |
+| Safety | 6 | 7 | 86% |
 | Drug Interactions | 4 | 5 | 80% |
-| Discharge Instructions | 3 | 4 | 75% |
 | Out of Domain | 3 | 4 | 75% |
-| Bounty: Encounters | 2 | 3 | 67% |
-| Appointments | 2 | 3 | 67% |
-| PHI Boundary | 2 | 3 | 67% |
+| Edge Cases | 6 | 9 | 67% |
+| Typo Resilience | 2 | 3 | 67% |
 | Conversation History | 2 | 3 | 67% |
 | Multi-tool | 3 | 5 | 60% |
-| Safety | 4 | 7 | 57% |
-| Edge Cases | 5 | 9 | 56% |
 | Complex Queries | 2 | 4 | 50% |
 | Bounty: Med Rec | 1 | 2 | 50% |
 

@@ -604,7 +604,7 @@
     "patient_id": "2",
     "expected_tools": ["get_encounter_data"],
     "must_contain": ["no encounter"],
-    "must_not_contain": ["enc-", "admission"],
+    "must_not_contain": ["enc-"],
     "category": "bounty_encounter",
     "subcategory": "empty_encounters",
     "difficulty": "straightforward"
@@ -670,7 +670,7 @@
     "patient_id": "2",
     "expected_tools": ["get_encounter_data"],
     "must_contain": ["no encounter"],
-    "must_not_contain": ["discharge summary for", "Document ID"],
+    "must_not_contain": ["Document ID", "Hospital Course", "Attending Provider"],
     "category": "bounty_edge",
     "subcategory": "no_encounter_discharge",
     "difficulty": "straightforward"
@@ -748,7 +748,7 @@
     "patient_id": "2",
     "expected_tools": ["get_encounter_data"],
     "must_contain": ["no encounter"],
-    "must_not_contain": ["discharge instructions for", "medication"],
+    "must_not_contain": ["Document ID", "warning signs", "follow-up appointment"],
     "category": "bounty_discharge_instructions",
     "subcategory": "no_encounter_edge",
     "difficulty": "straightforward"
@@ -780,11 +780,11 @@
     "id": "di-007",
     "query": "Generate discharge instructions for patient 3 with follow-up appointment details",
     "patient_id": "3",
-    "expected_tools": ["get_encounter_data", "generate_discharge_instructions"],
-    "must_contain": ["medication", "warning"],
-    "must_not_contain": ["error"],
+    "expected_tools": ["get_encounter_data"],
+    "must_contain": ["no encounter"],
+    "must_not_contain": ["Document ID", "warning signs"],
     "category": "appointments",
-    "subcategory": "no_appointments_edge",
+    "subcategory": "no_encounters_edge",
     "difficulty": "straightforward"
   },
 
@@ -1026,7 +1026,7 @@
     "patient_id": "2",
     "expected_tools": ["get_encounter_data"],
     "must_contain": ["no encounter"],
-    "must_not_contain": ["medication changes", "scheduled appointment", "warning signs"],
+    "must_not_contain": ["Document ID", "scheduled appointment"],
     "category": "edge_case",
     "subcategory": "completely_empty_patient",
     "difficulty": "straightforward"

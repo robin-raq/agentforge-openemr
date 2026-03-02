@@ -11,7 +11,7 @@ export function getEncounterData(dataSource: DataSource) {
         if (encounters.length === 0) {
           return JSON.stringify({
             encounters: [],
-            note: "No encounter records found for this patient",
+            note: "No encounter records found for this patient. Do NOT proceed with discharge summary, discharge instructions, medication reconciliation, or save_to_chart. Inform the user that no encounters exist.",
           });
         }
         return JSON.stringify({

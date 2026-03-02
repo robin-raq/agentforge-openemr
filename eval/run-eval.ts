@@ -272,8 +272,9 @@ async function runEval() {
     console.log(`🔍 Filtering to difficulty: ${filterDifficulty} (${cases.length} cases)\n`);
   }
   if (filterIdArg) {
-    cases = cases.filter((tc) => tc.id === filterIdArg);
-    console.log(`🔍 Running single case: ${filterIdArg}\n`);
+    const filterIds = filterIdArg.split(",");
+    cases = cases.filter((tc) => filterIds.includes(tc.id));
+    console.log(`🔍 Running ${filterIds.length} case(s): ${filterIdArg}\n`);
   }
 
   if (cases.length === 0) {
