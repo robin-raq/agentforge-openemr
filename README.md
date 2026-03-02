@@ -148,7 +148,7 @@ See [SECURITY.md](SECURITY.md) for the full security audit and remediation check
 |-------------|--------|------|
 | GitHub Repository | :white_check_mark: Setup guide, architecture overview, deployed link | [repo](https://github.com/robin-raq/agentforge-openemr) |
 | Demo Video (3-5 min) | :x: Agent in action, eval results, observability dashboard | — |
-| Pre-Search Document | :x: Completed checklist from Phase 1-3 | — |
+| Pre-Search Document | :white_check_mark: Completed checklist from Phase 1-3 | Submitted |
 | Agent Architecture Doc | :white_check_mark: 1-2 page breakdown | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | AI Cost Analysis | :white_check_mark: Dev spend + projections for 100/1K/10K/100K users | [AI_COST_ANALYSIS.md](AI_COST_ANALYSIS.md) |
 | Eval Dataset | :white_check_mark: 125 test cases with results (87.2% pass rate) | [eval/test-cases.json](eval/test-cases.json) \| [results](docs/eval-results.md) |
