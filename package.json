@@ -11,6 +11,7 @@
     "test:integration:fhir": "RUN_FHIR_INTEGRATION_TESTS=1 vitest run tests/fhir-integration.test.ts",
     "test:watch": "vitest",
     "eval": "tsx eval/run-eval.ts",
+    "fetch-mock": "tsx scripts/fetch-mock-from-fhir.ts",
     "build:local": "tsc"
   },
   "dependencies": {

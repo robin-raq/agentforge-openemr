@@ -24,10 +24,6 @@
     <div class="history-filter">
       <select id="history-filter-patient">
         <option value="">All Patients</option>
-        <option value="1">John Demo</option>
-        <option value="2">Jane Minimal</option>
-        <option value="3">Bob Allergic</option>
-        <option value="4">Sara Complex</option>
       </select>
     </div>
     <div class="history-list" id="history-list">
@@ -44,12 +40,8 @@
     <div class="patient-selector">
       <button class="new-chat-btn" id="new-chat-btn" title="Start a new conversation">+ New Chat</button>
       <label for="patient-select">Patient:</label>
-      <select id="patient-select">
-        <option value="">Select patient...</option>
-        <option value="1">Patient 1 - John Demo</option>
-        <option value="2">Patient 2 - Jane Minimal</option>
-        <option value="3">Patient 3 - Bob Allergic</option>
-        <option value="4">Patient 4 - Sara Complex</option>
+      <select id="patient-select" disabled>
+        <option value="">Loading patients...</option>
       </select>
     </div>
   </header>

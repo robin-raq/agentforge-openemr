@@ -1,3 +1,37 @@
+    // Patient list loaded from /api/patients (supports mock + FHIR)
+    const PATIENT_INFO = {};
+    const DEFAULT_PATIENTS = [
+      { id: '1', name: 'John Demo' },
+      { id: '2', name: 'Jane Minimal' },
+      { id: '3', name: 'Bob Allergic' },
+      { id: '4', name: 'Sara Complex' }
+    ];
+
+    async function loadPatients() {
+      let patients = [];
+      try {
+        const res = await fetch('/api/patients');
+        const data = await res.json();
+        patients = data.patients || [];
+      } catch (e) {
+        console.warn('Failed to load patients, using defaults:', e);
+      }
+      if (patients.length === 0) patients = DEFAULT_PATIENTS;
+      for (const p of patients) {
+        PATIENT_INFO[p.id] = { name: p.name, detail: 'ID: ' + p.id };
+      }
+      const patientSelect = document.getElementById('patient-select');
+      const historyFilter = document.getElementById('history-filter-patient');
+      patientSelect.innerHTML = '<option value="">Select patient...</option>';
+      historyFilter.innerHTML = '<option value="">All Patients</option>';
+      patients.forEach(function(p) {
+        patientSelect.add(new Option('Patient ' + p.id + ' - ' + p.name, p.id));
+        historyFilter.add(new Option(p.name, p.id));
+      });
+      patientSelect.disabled = false;
+    }
+    loadPatients();
+
     // Session persistence: reuse session_id across page reloads via localStorage
     const SESSION_KEY = 'agentforge_session_id';
     const PENDING_SEND_KEY = 'agentforge_pending_send';
@@ -470,14 +504,6 @@
     const sendBtn = document.getElementById('send-btn');
     const patientSelect = document.getElementById('patient-select');
     let messageIndex = 0;
-
-    // Patient metadata (mirrors src/ui-helpers.ts for TDD)
-    const PATIENT_INFO = {
-      '1': { name: 'John Demo', detail: 'DOB: 03/15/1958 | Male | Conditions: AFib, HTN, T2DM, Hyperlipidemia, GERD' },
-      '2': { name: 'Jane Minimal', detail: 'DOB: 07/22/1985 | Female | No active conditions' },
-      '3': { name: 'Bob Allergic', detail: 'DOB: 11/03/1972 | Male | Conditions: HTN | Multiple drug allergies' },
-      '4': { name: 'Sara Complex', detail: 'DOB: 05/28/1945 | Female | Multi-morbidity: AFib, HTN, T2DM, CKD' },
-    };
 
     function showPatientRequired() {
       const warn = document.getElementById('patient-warning');

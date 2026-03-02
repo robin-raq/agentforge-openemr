@@ -1,5 +1,5 @@
 import type {
-  DataSource, PatientData, MedicationData, LabResult,
+  DataSource, PatientData, PatientSummary, MedicationData, LabResult,
   EncounterData, AdmissionMedication, Appointment, DocumentRecord,
 } from "./datasource";
 import {
@@ -61,6 +61,26 @@ export class FhirDataSource implements DataSource {
   /** Clear the FHIR data cache. Useful for testing or forced refresh. */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  async listPatients(): Promise<PatientSummary[]> {
+    const bundle = await this.fhirFetch<{
+      entry?: Array<{
+        resource?: { id?: string; name?: Array<{ given?: string[]; family?: string }> };
+      }>;
+    }>("/Patient?_count=100&_elements=id,name");
+    const result: PatientSummary[] = [];
+    for (const e of bundle.entry ?? []) {
+      const r = e.resource;
+      if (!r?.id) continue;
+      const names = r.name ?? [];
+      const first = names[0];
+      const given = first?.given?.join(" ") ?? "";
+      const family = first?.family ?? "";
+      const name = [given, family].filter(Boolean).join(" ") || "Unknown";
+      result.push({ id: r.id, name });
+    }
+    return result;
   }
 
   private async resolveUuid(pid: string): Promise<string> {

@@ -83,7 +83,13 @@ export interface Appointment {
   status: "scheduled" | "confirmed" | "cancelled" | "completed";
 }
 
+export interface PatientSummary {
+  id: string;
+  name: string;
+}
+
 export interface DataSource {
+  listPatients(): Promise<PatientSummary[]>;
   getPatient(id: string): Promise<PatientData>;
   getMedications(patientId: string): Promise<MedicationData[]>;
   getLabResults(patientId: string): Promise<LabResult[]>;

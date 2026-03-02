@@ -3,6 +3,7 @@ import * as path from "path";
 import type {
   DataSource,
   PatientData,
+  PatientSummary,
   MedicationData,
   LabResult,
   EncounterData,
@@ -29,6 +30,13 @@ export class MockDataSource implements DataSource {
     const dataPath = path.join(__dirname, "mock-data.json");
     const raw = fs.readFileSync(dataPath, "utf-8");
     this.data = JSON.parse(raw);
+  }
+
+  async listPatients(): Promise<PatientSummary[]> {
+    return Object.entries(this.data.patients).map(([id, p]) => ({
+      id,
+      name: p.name,
+    }));
   }
 
   async getPatient(id: string): Promise<PatientData> {
