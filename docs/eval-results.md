@@ -6,8 +6,33 @@
 > **not** the LLM-as-judge rubric — the rubric is a separate opt-in pass
 > (`npm run eval -- --rubric`) and was not run for these numbers, so
 > `rubric_avg_score` is `"N/A"` in `eval/results.json`. The current default
-> model is `claude-sonnet-4-5` (configurable via `MODEL`); these figures have
-> **not** been re-measured on it. Source of truth: `eval/results.json`.
+> model is `claude-sonnet-4-5` (configurable via `MODEL`); a **current 125-case
+> run on it (with the repaired rubric)** is in the *Current run* section below —
+> it sits beside, and does **not** replace, this historical result. Source of
+> truth for the historical run: `eval/results.json`.
+
+## Current run — Sonnet 4.5 (2026-07-01, repaired rubric)
+
+Re-measured on the current default model `claude-sonnet-4-5`, all 125 cases,
+substring **and** LLM-judge rubric (judge `claude-haiku-4-5-20251001`).
+
+| Metric | Value |
+|--------|-------|
+| Substring pass | **81.6% (102/125)** |
+| Rubric pass (≥3.5) | **82.4% (103/125)**, avg **4.34 / 5** |
+| Grader agreement | 70.4% (88/125) |
+| p50 / p95 latency | 7.5s / 34.3s |
+| Source citation · disclaimer · verification_correct | 125/125 · 125/125 · 125/125 |
+| Scope violations · hallucination flags | 0 · 5/125 |
+| Total cost · avg per run | $1.66 · $0.013 |
+
+**Interpretation.** Substring pass dropped from the historical 87.2% (Sonnet 4)
+to 81.6% (Sonnet 4.5), largely because the brittle substring assertions
+penalize valid tool-selection differences (golden set 8/10 vs 10/10). The
+rubric — 82.4%, avg 4.34/5 — confirms answer **quality** stayed high. This is
+the case for grading by rubric, not substring alone.
+
+---
 
 ## Summary (historical · substring-graded · Sonnet 4)
 - **Eval pass rate:** 87.2% (109/125) — substring-graded
