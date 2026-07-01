@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      # Unit tests are hermetic: server/stream tests guard every LLM-dependent
+      # assertion on `status === 200`, so they skip (not fail) when the agent
+      # can't reach a model. A dummy key keeps CI free, offline, and
+      # deterministic — no paid API calls are made.
+      ANTHROPIC_API_KEY: sk-ant-ci-placeholder-not-a-real-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - name: Install (from lockfile)
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Eval harness smoke (zero-cost, no paid API calls)
+        run: npm run eval:smoke
