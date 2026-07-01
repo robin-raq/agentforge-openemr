@@ -161,10 +161,33 @@ Return ONLY the JSON, no other text.`;
 
 // ─── Judge Execution ────────────────────────────────────────────────
 
+/**
+ * Judge model id. The previous value `claude-haiku-4-20250514` was never a
+ * valid model id, so every judge call 404'd into the catch below. Override
+ * with RUBRIC_JUDGE_MODEL.
+ */
+export function getJudgeModel(): string {
+  return process.env.RUBRIC_JUDGE_MODEL?.trim() || "claude-haiku-4-5-20251001";
+}
+
+/**
+ * Throw if the rubric judge is missing required configuration. Call this once
+ * before judging so a missing key fails loudly up front instead of letting
+ * every case silently score -1 (which used to read as a passing quality gate).
+ */
+export function assertRubricConfigured(): void {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    throw new Error(
+      "Rubric judge requires ANTHROPIC_API_KEY. Set it before running the eval with --rubric."
+    );
+  }
+}
+
 let anthropicClient: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!anthropicClient) {
+    assertRubricConfigured();
     anthropicClient = new Anthropic();
   }
   return anthropicClient;
@@ -182,7 +205,7 @@ export async function scoreWithRubric(
 
   try {
     const result = await client.messages.create({
-      model: "claude-haiku-4-20250514",
+      model: getJudgeModel(),
       max_tokens: 512,
       temperature: 0,
       messages: [{ role: "user", content: prompt }],
@@ -231,23 +254,11 @@ export async function scoreWithRubric(
       judge_latency_ms: judgeLatencyMs,
     };
   } catch (err) {
-    const judgeLatencyMs = Date.now() - start;
-    console.warn(
-      `Rubric judge error: ${err instanceof Error ? err.message : String(err)}`
-    );
-
-    // Return a fallback result — don't crash the eval
-    return {
-      scores: DIMENSIONS.map((d) => ({
-        dimension: d.name,
-        score: -1,
-        justification: "Judge error — could not score",
-        weight: d.default_weight,
-      })),
-      overall_score: -1,
-      quality_level: "Error",
-      judge_latency_ms: judgeLatencyMs,
-    };
+    // Fail loudly. The old code swallowed errors and returned overall_score:-1,
+    // which checkQualityGate then treated as a PASS — so a judge that never ran
+    // looked like a clean sweep. Propagate so the caller can surface it.
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Rubric judge failed (model=${getJudgeModel()}): ${msg}`);
   }
 }
 
@@ -266,7 +277,12 @@ export function checkQualityGate(
   result: RubricResult
 ): { passed: boolean; failures: string[] } {
   if (result.overall_score < 0) {
-    return { passed: true, failures: [] }; // Skip if judge errored
+    // A negative score means the judge did not produce a valid result. That is
+    // a failure to evaluate, not a pass — never let it read as a passing gate.
+    return {
+      passed: false,
+      failures: ["Rubric judge did not return a valid score"],
+    };
   }
 
   const failures: string[] = [];

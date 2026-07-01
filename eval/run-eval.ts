@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { chat } from "../src/agent";
 import { PATIENT_TOOLS } from "../src/constants";
-import { scoreWithRubric, checkQualityGate, QUALITY_THRESHOLDS } from "./rubric-judge";
+import { scoreWithRubric, checkQualityGate, QUALITY_THRESHOLDS, assertRubricConfigured, getJudgeModel } from "./rubric-judge";
 import type { RubricResult } from "./rubric-judge";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -49,9 +49,20 @@ interface EvalResult {
   category?: string;
   subcategory?: string;
   difficulty?: string;
+  // Token usage + estimated cost per case (Phase 11: cost-per-run metric)
+  token_usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
+  estimated_cost_usd?: number;
   // Rubric scoring (Stage 4)
   rubric?: RubricResult;
   rubric_quality_gate?: { passed: boolean; failures: string[] };
+}
+
+/**
+ * Estimate USD cost at Claude Sonnet pricing ($3/M input, $15/M output).
+ * Matches server computeCost; an estimate — verify against the model's pricing.
+ */
+function estimateCost(u: { input_tokens: number; output_tokens: number }): number {
+  return parseFloat(((u.input_tokens * 3 + u.output_tokens * 15) / 1_000_000).toFixed(6));
 }
 
 /** Performance target thresholds (cookbook Stage 2: 80% threshold) */
@@ -301,7 +312,10 @@ async function runEval() {
   }
 
   if (enableRubric) {
-    console.log("🔬 LLM-as-judge rubric scoring ENABLED (--rubric)\n");
+    // Fail fast and loudly if the judge is misconfigured, rather than letting
+    // every case error into an "N/A" that looks like a clean run.
+    assertRubricConfigured();
+    console.log(`🔬 LLM-as-judge rubric scoring ENABLED (--rubric) — judge model: ${getJudgeModel()}\n`);
   }
 
   let passed = 0;
@@ -576,6 +590,12 @@ async function runEval() {
         category: tc.category,
         subcategory: tc.subcategory,
         difficulty: tc.difficulty,
+        token_usage: {
+          input_tokens: result.tokenUsage.input_tokens,
+          output_tokens: result.tokenUsage.output_tokens,
+          total_tokens: result.tokenUsage.total_tokens,
+        },
+        estimated_cost_usd: estimateCost(result.tokenUsage),
         rubric: assertions.rubricResult,
         rubric_quality_gate: assertions.rubricQualityGate,
       };
@@ -870,6 +890,10 @@ async function runEval() {
 
     // Quality gates
     console.log(`\nQuality gates passed: ${rubricGatesPassedCount}/${rubricResults.length}`);
+  } else if (enableRubric) {
+    // Rubric was requested but produced zero valid scores — surface it instead
+    // of silently writing "N/A" as if the run were clean.
+    console.error("\n❌ RUBRIC GATE FAILED: --rubric was enabled but no case produced a valid score. Check the judge errors above (model/key/JSON).");
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1013,6 +1037,10 @@ async function runEval() {
   }
   if (evalPassRate < TARGETS.eval_pass_rate) {
     console.error(`\n❌ STAGE 2 GATE FAILED: Pass rate ${(evalPassRate * 100).toFixed(1)}% < ${(TARGETS.eval_pass_rate * 100).toFixed(0)}% threshold.`);
+    process.exit(1);
+  }
+  if (enableRubric && rubricResults.length === 0) {
+    console.error("\n❌ RUBRIC GATE FAILED: --rubric requested but no valid scores were produced.");
     process.exit(1);
   }
 
