@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { trace } from "@opentelemetry/api";
 import type { DataSource } from "./data/datasource";
 import { MockDataSource } from "./data/mock-datasource";
 import { FhirDataSource } from "./data/fhir-datasource";
@@ -135,6 +136,24 @@ export function getLangfuseCallbacks(sessionId?: string): unknown[] {
     console.warn("Langfuse callback handler init failed:", err instanceof Error ? err.message : err);
   }
   return [];
+}
+
+/**
+ * Return the active OpenTelemetry trace id — the real provider trace id that
+ * Langfuse exports — or null if there is no active recording span. This is the
+ * honest replacement for the old cosmetic trace_id: we never fabricate one.
+ * When tracing is disabled or no span is active, callers get null and should
+ * correlate by session_id (the Langfuse correlation key) plus request_id.
+ */
+export function getActiveTraceId(): string | null {
+  try {
+    const id: string | undefined = trace.getActiveSpan()?.spanContext()?.traceId;
+    // Invalid / non-recording spans report an all-zero trace id.
+    if (!id || /^0+$/.test(id)) return null;
+    return id;
+  } catch {
+    return null;
+  }
 }
 
 export function warnInsecureTls(): void {

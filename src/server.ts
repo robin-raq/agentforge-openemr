@@ -7,8 +7,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { chat, chatStream } from "./agent";
 import type { ChatResult } from "./agent";
-import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls, getDataSource } from "./config";
-import type { DataSource } from "./data/datasource";
+import { PORT, getLangfuseCallbacks, initLangfuse, warnInsecureTls, getDataSource, getActiveTraceId } from "./config";
 import {
   MAX_SESSIONS,
   MAX_HISTORY_LENGTH,
@@ -121,7 +120,8 @@ export interface ChatResponsePayload {
     tools_called: string[];
     confidence_score: number;
     sources: string[];
-    trace_id: string;
+    request_id: string;
+    trace_id: string | null;
     latency_ms: number;
     llm_inference_ms: number;
     tool_execution_ms: number;
@@ -164,7 +164,8 @@ export function detectSignals(result: ChatResult): {
 }
 
 /**
- * Compute estimated cost in USD at Claude Sonnet 4 pricing ($3/M input, $15/M output).
+ * Compute estimated cost in USD at Claude Sonnet pricing ($3/M input, $15/M output).
+ * This is an estimate; verify against the configured MODEL's actual pricing.
  */
 export function computeCost(tokenUsage: ChatResult["tokenUsage"]): number {
   return parseFloat(((tokenUsage.input_tokens * 3 + tokenUsage.output_tokens * 15) / 1_000_000).toFixed(6));
@@ -180,7 +181,8 @@ export interface BuildStructuredResultInput {
     tools_called: string[];
     confidence_score: number;
     sources: string[];
-    trace_id: string;
+    request_id: string;
+    trace_id: string | null;
     latency_ms: number;
     llm_inference_ms: number;
     tool_execution_ms: number;
@@ -278,7 +280,10 @@ export function buildChatResponse(result: ChatResult): ChatResponsePayload {
     tools_called: toolNames,
     confidence_score: confidence.score,
     sources,
-    trace_id: randomUUID().slice(0, 12),
+    // request_id: local correlation id, logged server-side. trace_id: the real
+    // OTel/Langfuse trace id when a span is active, else null — never a fake.
+    request_id: randomUUID(),
+    trace_id: getActiveTraceId(),
     latency_ms: result.durationMs,
     llm_inference_ms: llmInferenceMs,
     tool_execution_ms: toolSumMs,
@@ -534,7 +539,7 @@ export function validateChatRequest(
   body: { message?: unknown; session_id?: unknown; patient_id?: unknown },
   reqIp?: string
 ): ValidationResult {
-  const { message, session_id, patient_id } = body;
+  const { message, session_id } = body;
 
   // Message existence + type check
   if (!message || typeof message !== "string") {
