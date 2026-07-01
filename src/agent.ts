@@ -195,7 +195,7 @@ const systemMessage = new SystemMessage({
     type: "text",
     text: SYSTEM_PROMPT,
     cache_control: { type: "ephemeral" },
-  }] as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- LangChain types don't expose cache_control but the Anthropic adapter passes it through
+  }] as any,  
 });
 
 const prompt = ChatPromptTemplate.fromMessages([
@@ -205,6 +205,17 @@ const prompt = ChatPromptTemplate.fromMessages([
   new MessagesPlaceholder("agent_scratchpad"),
 ]);
 
+// Default chat model. The previous pin `claude-sonnet-4-20250514` was retired
+// by the provider and now returns 404, which broke the live agent. Override
+// with the MODEL env var (e.g. to pin a snapshot or downgrade for cost).
+export const DEFAULT_MODEL = "claude-sonnet-4-5";
+
+/** Resolve the chat model id: MODEL env var if set, else DEFAULT_MODEL. */
+export function getModelId(): string {
+  const m = process.env.MODEL?.trim();
+  return m && m.length > 0 ? m : DEFAULT_MODEL;
+}
+
 // Shared LLM singleton — ChatAnthropic is stateless config, so we
 // reuse the same instance across all createAgentExecutor() calls.
 let sharedLlm: ChatAnthropic | null = null;
@@ -212,8 +223,14 @@ let sharedLlm: ChatAnthropic | null = null;
 export function getSharedLlm(): ChatAnthropic {
   if (!sharedLlm) {
     sharedLlm = new ChatAnthropic({
-      model: "claude-sonnet-4-20250514",
+      model: getModelId(),
       temperature: 0,
+      // Omit top_p entirely (topP:null -> instance.topP undefined -> not sent).
+      // @langchain/anthropic@0.3.x otherwise sends a sentinel top_p that current
+      // Claude models reject (Sonnet 4.5: "temperature and top_p cannot both be
+      // specified"; Sonnet 5 / Opus 4.8: "top_p is deprecated"). temperature:0
+      // alone gives greedy/deterministic decoding on Sonnet 4.5.
+      topP: null,
       maxTokens: MAX_RESPONSE_TOKENS,
       anthropicApiKey: getAnthropicApiKey(),
     });
