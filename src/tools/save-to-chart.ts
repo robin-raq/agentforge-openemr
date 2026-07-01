@@ -1,10 +1,10 @@
-import { tool } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { z } from "zod";
 import type { DataSource } from "../data/datasource";
 import { getErrorMessage } from "../utils/errors";
 
 export function saveToChart(dataSource: DataSource) {
-  return tool(
+  return defineTool(
     async ({ patient_id, encounter_id, document_type, content }) => {
       try {
         const document = await dataSource.saveDocument({

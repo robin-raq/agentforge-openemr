@@ -1,4 +1,4 @@
-import { tool } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { z } from "zod";
 import { MAX_MEDICATIONS_FOR_FDA, FDA_API_TIMEOUT_MS } from "../constants";
 
@@ -51,7 +51,7 @@ function findInteractions(medications: string[]): typeof KNOWN_INTERACTIONS {
 }
 
 export function drugInteractionCheck() {
-  return tool(
+  return defineTool(
     async ({ medications }) => {
       if (!medications || medications.length < 2) {
         return JSON.stringify({
@@ -90,7 +90,7 @@ export function drugInteractionCheck() {
             }
           }
 
-          let interactions: Array<{
+          const interactions: Array<{
             drugs: string[];
             drug_pair: string;
             severity: string;
@@ -108,10 +108,13 @@ export function drugInteractionCheck() {
                 try {
                   const res = await fetch(url, { signal: controller.signal });
                   if (res.ok) {
-                    const json = await res.json();
+                    const json = (await res.json()) as {
+                      results?: Array<Record<string, unknown>>;
+                    };
                     if (json.results && json.results.length > 0) {
                       const label = json.results[0];
-                      const drugInteractions = label.drug_interactions || [];
+                      const drugInteractions =
+                        (label.drug_interactions as unknown[]) || [];
                       return drugInteractions.map((di: unknown) => ({
                         drugs: [drug1, drug2],
                         drug_pair: `${drug1} + ${drug2}`,

@@ -1,10 +1,10 @@
-import { tool } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { z } from "zod";
 import type { DataSource } from "../data/datasource";
 import { getErrorMessage } from "../utils/errors";
 
 export function getPatientSummary(dataSource: DataSource) {
-  return tool(
+  return defineTool(
     async ({ patient_id }) => {
       try {
         const patient = await dataSource.getPatient(patient_id);

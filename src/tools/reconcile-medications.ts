@@ -1,13 +1,13 @@
-import { tool } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { z } from "zod";
 import type { DataSource } from "../data/datasource";
 import { getErrorMessage } from "../utils/errors";
 
 export function reconcileMedications(dataSource: DataSource) {
-  return tool(
+  return defineTool(
     async ({ patient_id, encounter_id }) => {
       try {
-        const [currentMeds, admissionMeds, patient] = await Promise.all([
+        const [_currentMeds, admissionMeds, patient] = await Promise.all([
           dataSource.getMedications(patient_id),
           dataSource.getAdmissionMedications(encounter_id),
           dataSource.getPatient(patient_id),

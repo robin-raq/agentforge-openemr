@@ -1,4 +1,4 @@
-import { tool } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { z } from "zod";
 import type { DataSource } from "../data/datasource";
 import { getErrorMessage } from "../utils/errors";
@@ -47,7 +47,7 @@ function checkCrossReactivity(
 }
 
 export function allergyCheck(dataSource: DataSource) {
-  return tool(
+  return defineTool(
     async ({ patient_id, proposed_medication }) => {
       try {
         const patient = await dataSource.getPatient(patient_id);

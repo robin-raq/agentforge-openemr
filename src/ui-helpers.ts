@@ -110,7 +110,7 @@ export function escapeHtml(text: string): string {
  */
 export function renderMarkdown(text: string): string {
   // 1. Escape HTML first
-  let html = escapeHtml(text);
+  const html = escapeHtml(text);
 
   // 2. Split into lines for block-level processing
   const lines = html.split("\n");

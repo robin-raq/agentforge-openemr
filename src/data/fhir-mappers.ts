@@ -63,7 +63,8 @@ interface FhirBundle<T> {
 }
 
 function extractMedicationName(mr: FhirMedicationRequest): string {
-  const med = mr.medicationCodeableConcept ?? mr.medicationReference;
+  const med: { text?: string; display?: string } | undefined =
+    mr.medicationCodeableConcept ?? mr.medicationReference;
   return med?.text ?? med?.display ?? "Unknown medication";
 }
 

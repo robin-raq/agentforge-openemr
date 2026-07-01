@@ -8,7 +8,6 @@
  * Base URL: https://dailymed.nlm.nih.gov/dailymed/services/v2/
  */
 
-import { getErrorMessage } from "../utils/errors";
 import { TtlCache } from "../cache";
 
 const DAILYMED_BASE_URL =
@@ -106,7 +105,9 @@ export async function searchDrug(
     throw new Error(`DailyMed search failed: HTTP ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as {
+    data?: Array<{ setid: string; title: string; published_date: string; spl_version: number }>;
+  };
   const results = (data.data || []).map(
     (entry: {
       setid: string;

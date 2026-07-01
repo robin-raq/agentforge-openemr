@@ -46,7 +46,7 @@ export interface VerificationResult {
   toolCalls: Array<{ name: string; args: unknown; result?: string }>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type ToolVerificationHandler = (data: any) => string[];
 
 const TOOL_HANDLERS: Record<string, ToolVerificationHandler> = {

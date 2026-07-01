@@ -16,6 +16,7 @@
 import type {
   DataSource,
   PatientData,
+  PatientSummary,
   MedicationData,
   LabResult,
   EncounterData,
@@ -60,6 +61,13 @@ export class CachedDataSource implements DataSource {
   }
 
   // ─── Cached read methods ──────────────────────────────────────────
+
+  listPatients(): Promise<PatientSummary[]> {
+    return this.cachedCall(
+      this.cacheKey("listPatients"),
+      () => this.inner.listPatients(),
+    );
+  }
 
   getPatient(id: string): Promise<PatientData> {
     return this.cachedCall(

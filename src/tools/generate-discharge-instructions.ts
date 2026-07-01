@@ -1,4 +1,4 @@
-import { tool } from "@langchain/core/tools";
+import { defineTool } from "./define-tool";
 import { z } from "zod";
 import type { DataSource } from "../data/datasource";
 import { getDrugEducation, DISCHARGE_EDUCATION_SECTIONS } from "../data/dailymed-client";
@@ -73,7 +73,7 @@ const CONDITION_FOLLOW_UP: Record<string, string[]> = {
 };
 
 export function generateDischargeInstructions(dataSource: DataSource) {
-  return tool(
+  return defineTool(
     async ({ patient_id, encounter_id }) => {
       try {
         const [patient, encounters, admissionMeds, appointments] = await Promise.all([
