@@ -1,8 +1,8 @@
 # AI Cost Analysis
 
 **Last updated:** March 2025
-**Model:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) via Anthropic API
-**Pricing:** $3.00/1M input tokens, $15.00/1M output tokens (prompt caching: $0.30/1M cache read)
+**Model:** Claude Sonnet 4.5 (`claude-sonnet-4-5`, default; configurable via `MODEL`) via Anthropic API
+**Pricing:** $3.00/1M input, $15.00/1M output, $0.30/1M cache read — *the dev-spend and per-query figures below are **historical**, measured on the now-retired `claude-sonnet-4-20250514`. Verify current Sonnet 4.5 pricing before quoting live projections.*
 
 ---
 
@@ -165,8 +165,9 @@ Output tokens dominate because they're 5× more expensive than input tokens. Dis
 
 | Model | Input ($/1M) | Output ($/1M) | Per-Query Cost | Quality for Clinical |
 |-------|--------------|---------------|----------------|---------------------|
-| Claude Sonnet 4 (current) | $3.00 | $15.00 | ~$0.032 | Excellent |
-| Claude Haiku 4 | $1.00 | $5.00 | ~$0.011 | Good (simple queries) |
+| Claude Sonnet 4 (historical — retired; figures measured on it) | $3.00 | $15.00 | ~$0.032 | Excellent |
+| Claude Sonnet 4.5 (current default) | verify | verify | verify | Excellent |
+| Claude Haiku 4.5 | verify | verify | ~ | Good (simple queries) |
 | GPT-4o | $5.00 | $15.00 | ~$0.038 | Comparable |
 | GPT-4o-mini | $0.15 | $0.60 | ~$0.001 | Lower quality |
 | Llama 3.1 70B (Groq) | ~$0.10 | ~$0.10 | ~$0.0004 | Untested for clinical |

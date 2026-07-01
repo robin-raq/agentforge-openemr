@@ -71,7 +71,8 @@ These items are acknowledged gaps in the current build. The agent runs with **mo
 ## Infrastructure
 
 - [ ] Migrate from Railway to HIPAA-compliant hosting (AWS GovCloud, Azure Healthcare APIs)
-- [ ] Set up CI/CD pipeline with automated eval runs on every PR
+- [x] CI workflow — install + lint + typecheck + unit tests + build on every push/PR (`.github/workflows/ci.yml`)
+- [ ] Extend CI with automated eval runs on every PR (deferred — the eval suite makes paid model calls, so it needs a budgeted API key in CI)
 - [ ] Add staging environment for pre-production testing
 - [ ] Implement database-backed document storage (replace in-memory JSON)
 - [ ] Add automated backup and disaster recovery for session and document data

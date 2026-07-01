@@ -199,8 +199,8 @@ Agent presents plain-language instructions the patient can understand
 
 ## Technical Stats
 
-- **484 unit tests** passing (TDD throughout, including DailyMed client + discharge instructions tests)
-- **125 eval cases** across 28 categories at 87.2% pass rate
+- **494 unit tests** passing (TDD throughout, including DailyMed client + discharge instructions tests)
+- **125 eval cases** across 28 categories at 87.2% pass rate (substring-graded, historical run on the now-retired `claude-sonnet-4-20250514`; 4 of 7 performance targets met — see [docs/eval-results.md](docs/eval-results.md))
 - **10 tools** total (5 original + 5 bounty)
 - **3 server endpoints** for document CRUD
 - **2 data sources**: OpenEMR (FHIR R4) + DailyMed (NLM/NIH REST API)

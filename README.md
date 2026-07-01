@@ -8,7 +8,7 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 ![Architecture Diagram](docs/architecture-diagram.svg)
 
-**Agent:** LangChain.js + Claude Sonnet 4 using `createToolCallingAgent` with native tool-calling. The agent reasons over clinical queries, selects from 10 tools, executes multi-step workflows (up to 6 iterations), and synthesizes results with source attribution and safety verification.
+**Agent:** LangChain.js + Claude Sonnet 4.5 (`claude-sonnet-4-5`, configurable via the `MODEL` env var) using `createToolCallingAgent` with native tool-calling. The agent reasons over clinical queries, selects from 10 tools, executes multi-step workflows (up to 6 iterations), and synthesizes results with source attribution and safety verification.
 
 **10 Tools:**
 
@@ -32,7 +32,7 @@ AI-powered clinical query agent for OpenEMR. Handles discharge summaries, medica
 
 **Verification Layer:** Post-LLM safety checks on every response — drug interaction severity gate, allergy conflict detection, critical lab flagging, medication change alerts, source attribution, and medical disclaimer.
 
-**Observability:** Langfuse tracing with per-request spans, session grouping, and feedback correlation.
+**Observability:** Langfuse tracing (OpenTelemetry) with per-request spans and session grouping. Each API response carries a local `request_id` for server-log correlation and a `trace_id` that holds the real provider trace id when a span is active (otherwise `null` — never a fabricated id); traces are correlated in Langfuse by `session_id`.
 
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture documentation.
 
@@ -44,7 +44,11 @@ Available on npm: [`agentforge-clinical-agent`](https://www.npmjs.com/package/ag
 
 ![Eval Results](docs/eval-results-summary.svg)
 
-**125 eval cases** across 28 categories — **87.2% pass rate** (109/125) on all 10 tools. p50 latency: 6.2s, p95: 28.4s.
+**125 eval cases** across 28 categories — **87.2% pass rate** (109/125), **substring-graded** (keyword assertions, not the LLM-judge rubric) on a **historical run** against the now-retired `claude-sonnet-4-20250514`. The current default model is `claude-sonnet-4-5`; these numbers have not been re-measured on it. p50 latency 6.2s, p95 28.4s.
+
+**Performance targets met: 4 of 7.** Met: golden-set 100%, eval pass ≥80%, hallucination ≤5% (3.2%), verification ≥90% (99.2%). **Missed:** single-tool latency (6986ms avg vs 5000), multi-step latency (24914ms vs 15000), tool success rate (94.0% vs 95%). Full breakdown and provenance in [docs/eval-results.md](docs/eval-results.md). The LLM-as-judge rubric is a separate opt-in pass (`npm run eval -- --rubric`).
+
+Eval cases passed per category (substring-graded; the `latency` row counts the 3 latency *test cases* that passed, not the latency performance targets above):
 
 | Category | Passed | Total | Rate |
 |----------|--------|-------|------|
@@ -79,6 +83,25 @@ Available on npm: [`agentforge-clinical-agent`](https://www.npmjs.com/package/ag
 
 See [evals.md](evals.md) for the full eval framework docs.
 
+## Current Evidence
+
+A precise separation of what is **verified now** vs. **historical** vs. **proposed**, so every claim can be cross-checked against the repo.
+
+**Verified current behavior** (reproducible from a clean clone)
+- `npm test` → **494 unit tests passing** (+ 9 integration tests skipped behind flags); `npx tsc --noEmit` clean. Validated in CI (`.github/workflows/ci.yml`).
+- Default model is `claude-sonnet-4-5` (override via the `MODEL` env var). The previous `claude-sonnet-4-20250514` was retired by the provider and now 404s.
+- Each API response returns a local `request_id` and a `trace_id` that holds the real OpenTelemetry/Langfuse trace id when a span is active, otherwise `null` — never a fabricated id. Langfuse correlation key is `session_id`.
+- The LLM-as-judge rubric is operational and opt-in (`npm run eval -- --rubric`; judge model `claude-haiku-4-5-20251001`). It fails **loudly** when misconfigured instead of silently scoring `-1`.
+
+**Historical results** (not re-measured on the current model)
+- Eval pass rate **87.2% (109/125)**, **substring-graded**, from a 2026-03-02 run on the now-retired Sonnet 4. **4 of 7** performance targets met; p95 latency **28.4s**. Source of truth: `eval/results.json`; breakdown in [docs/eval-results.md](docs/eval-results.md). `rubric_avg_score` is `"N/A"` there because the rubric is a separate pass that was not run.
+
+**Proposed / production hardening** (designed, not implemented)
+- Authentication + RBAC, pre-execution patient-scope guard, encrypted session storage, real-trace-id capture wiring, cost/token capture in the eval harness, automated eval-on-PR in CI. See [FUTURE_WORK.md](FUTURE_WORK.md).
+
+**Known limitations**
+- Demo-grade security posture (not HIPAA-compliant); prompt-injection defense is detection-only (advisory, non-blocking); drug-interaction severity is heuristic; the OpenEMR iframe module is a thin shell. All catalogued in [FUTURE_WORK.md](FUTURE_WORK.md).
+
 ## Bounty Features
 
 ### New Data Source: DailyMed (NLM/NIH)
@@ -100,11 +123,13 @@ Discharge instructions include actual scheduled follow-up appointments with prov
 ## Setup
 
 ```bash
-cd openemr/agent
+git clone https://github.com/robin-raq/agentforge-openemr.git
+cd agentforge-openemr
 npm install
 cp .env.example .env
-# Edit .env with your ANTHROPIC_API_KEY (required)
-# Optional: LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY for observability
+# Edit .env: set ANTHROPIC_API_KEY (required).
+# MODEL defaults to claude-sonnet-4-5; override to pin a snapshot or a cheaper model.
+# Optional: LANGFUSE_SECRET_KEY + LANGFUSE_PUBLIC_KEY for observability.
 ```
 
 ## Run
@@ -119,7 +144,7 @@ Open http://localhost:3000 (local) or https://agent-production-6f7a.up.railway.a
 ## Test
 
 ```bash
-npm test       # Run 484 unit tests (Vitest)
+npm test       # Run 494 unit tests (Vitest)
 npm run eval   # Run 125 eval cases (requires ANTHROPIC_API_KEY)
 ```
 
@@ -151,7 +176,7 @@ The patient dropdown loads from `GET /api/patients`, which reads from mock data 
 
 ## Security
 
-The agent runs with **mock data by default** — no real PHI is exposed. The following security controls are implemented, along with known limitations for production hardening.
+The agent runs with **mock data by default** (`DATA_SOURCE=mock`) — no real PHI is exposed in the default configuration. The following security controls are implemented, along with known limitations for production hardening (this is a **demo-grade** posture, not a HIPAA-compliant deployment — see [FUTURE_WORK.md](FUTURE_WORK.md)).
 
 **Implemented Controls:**
 
@@ -159,8 +184,8 @@ The agent runs with **mock data by default** — no real PHI is exposed. The fol
 |---------|---------------|
 | Input validation | Zod schemas on all tool inputs; regex validation on patient IDs, session IDs, document IDs |
 | Rate limiting | 10 req/min per IP with configurable window (`server.ts`) |
-| Prompt injection detection | 10 regex patterns + system prompt reinforcement on detection |
-| Patient scope enforcement | Post-execution verification blocks cross-patient data in responses |
+| Prompt injection detection | 10 regex patterns flag likely-injection inputs and reinforce the system prompt — **detection is advisory, it does not block the request** |
+| Patient scope enforcement | **Post-execution** check blocks cross-patient data from appearing in responses (a tool may execute before the block fires; pre-execution guard is future work) |
 | Security headers | X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP |
 | CORS | Configurable allowed origins; credentials restricted to explicit origins |
 | Session management | Server-generated UUIDs, auto-cleanup via TTL, max history depth |
@@ -181,7 +206,7 @@ See [FUTURE_WORK.md](FUTURE_WORK.md) for known limitations, security hardening r
 | Pre-Search Document | :white_check_mark: Completed checklist from Phase 1-3 | Submitted |
 | Agent Architecture Doc | :white_check_mark: 1-2 page breakdown | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | AI Cost Analysis | :white_check_mark: Dev spend + projections for 100/1K/10K/100K users | [AI_COST_ANALYSIS.md](AI_COST_ANALYSIS.md) |
-| Eval Dataset | :white_check_mark: 125 test cases with results (87.2% pass rate) | [eval/test-cases.json](eval/test-cases.json) \| [results](docs/eval-results.md) |
+| Eval Dataset | :white_check_mark: 125 test cases, 87.2% pass (substring-graded, historical; 4/7 perf targets) | [eval/test-cases.json](eval/test-cases.json) \| [results](docs/eval-results.md) |
 | Open Source Link | :white_check_mark: Published npm package | [agentforge-clinical-agent](https://www.npmjs.com/package/agentforge-clinical-agent) |
 | Deployed Application | :white_check_mark: Publicly accessible agent interface | [Railway](https://agent-production-6f7a.up.railway.app) |
 | Evaluation Framework | :white_check_mark: Correctness, tool selection, safety, adversarial, edge cases | [evals.md](evals.md) |

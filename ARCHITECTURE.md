@@ -21,9 +21,9 @@
 
 **Framework:** LangChain.js with `createToolCallingAgent` and `AgentExecutor`. Chosen for native Claude tool-calling support, built-in iteration control (max 6), conversation history management, and callback-based observability hooks.
 
-**LLM:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) at temperature 0 for deterministic clinical responses. Hard 90-second timeout via `Promise.race`.
+**LLM:** Claude Sonnet 4.5 (`claude-sonnet-4-5`, configurable via the `MODEL` env var) at temperature 0 for deterministic clinical responses. Hard 90-second timeout via `Promise.race`. (The previous pin `claude-sonnet-4-20250514` was retired by the provider; historical eval numbers were measured on it.)
 
-**Reasoning approach:** The agent implements the ReAct pattern (Think → Act → Observe → Repeat) via Claude's native tool-calling API and LangChain's `AgentExecutor`. Rather than parsing explicit "Thought:/Action:/Observation:" text, the same reasoning loop is handled through structured tool-call messages — more reliable for clinical contexts where deterministic tool selection matters. The system prompt encodes clinical rules: never prescribe, always cite sources, flag critical findings, differentiate clinician-facing vs. patient-facing language. The agent decides which tools to call based on the query, executes them (up to 10 iterations for multi-step workflows), and synthesizes results into a natural-language response.
+**Reasoning approach:** The agent implements the ReAct pattern (Think → Act → Observe → Repeat) via Claude's native tool-calling API and LangChain's `AgentExecutor`. Rather than parsing explicit "Thought:/Action:/Observation:" text, the same reasoning loop is handled through structured tool-call messages — more reliable for clinical contexts where deterministic tool selection matters. The system prompt encodes clinical rules: never prescribe, always cite sources, flag critical findings, differentiate clinician-facing vs. patient-facing language. The agent decides which tools to call based on the query, executes them (up to 6 iterations for multi-step workflows; `maxIterations: 6`), and synthesizes results into a natural-language response.
 
 **Tool design:** All 10 tools use `tool()` from `@langchain/core/tools` with Zod input schemas and return `JSON.stringify(result)`. Tools accept a `DataSource` dependency for testability (mock vs. FHIR). The 5 MVP tools handle core queries; the 5 bounty tools handle discharge workflows:
 
@@ -117,7 +117,7 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 - The agent rarely exceeds 3 iterations; most queries resolve in 1-2 tool calls (maxIterations: 6)
 - DailyMed API calls add 2-4s when drug education is requested (external HTTP dependency)
 
-**Unit testing:** 484 tests via Vitest covering all tools, data sources, verification logic, server routes, and agent configuration. TDD-driven development throughout.
+**Unit testing:** 494 tests via Vitest covering all tools, data sources, verification logic, server routes, agent configuration, the rubric judge, and trace correlation. TDD-driven development throughout.
 
 ---
 
@@ -137,4 +137,4 @@ Post-LLM verification runs on every response via `applyVerification(response, to
 
 **Deployed at:** https://agent-production-6f7a.up.railway.app
 
-**Stack:** LangChain.js + Claude Sonnet 4 + Express + Vitest + Langfuse, deployed on Railway.
+**Stack:** LangChain.js + Claude Sonnet 4.5 + Express + Vitest + Langfuse, deployed on Railway.

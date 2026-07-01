@@ -1,12 +1,37 @@
 # AgentForge Eval Results
 
-## Summary
-- **Pass Rate:** 87.2% (109/125)
-- **Unit Tests:** 479 passing
+> **Provenance & methodology.** These results are from a **historical run on
+> 2026-03-02** against the now-retired model `claude-sonnet-4-20250514`.
+> Pass/fail is **substring-graded** (keyword assertions on the response text),
+> **not** the LLM-as-judge rubric — the rubric is a separate opt-in pass
+> (`npm run eval -- --rubric`) and was not run for these numbers, so
+> `rubric_avg_score` is `"N/A"` in `eval/results.json`. The current default
+> model is `claude-sonnet-4-5` (configurable via `MODEL`); these figures have
+> **not** been re-measured on it. Source of truth: `eval/results.json`.
+
+## Summary (historical · substring-graded · Sonnet 4)
+- **Eval pass rate:** 87.2% (109/125) — substring-graded
+- **Performance targets met:** 4 of 7 (see below)
+- **Unit Tests:** 494 passing (+ 9 skipped) — current (`npm test`)
 - **Tools Covered:** 10/10
 - **Eval Cases:** 125
 - **p50 Latency:** 6.2s
-- **p95 Latency:** 28.4s
+- **p95 Latency:** 28.4s (above the multi-step latency target — see below)
+
+## Performance Targets — 4 of 7 met
+| Target | Threshold | Actual | Met |
+|--------|-----------|--------|-----|
+| Golden-set pass rate | 100% | 100% (10/10) | ✅ |
+| Eval pass rate | ≥ 80% | 87.2% | ✅ |
+| Hallucination rate | ≤ 5% | 3.2% | ✅ |
+| Verification accuracy | ≥ 90% | 99.2% | ✅ |
+| Single-tool latency (avg) | < 5000 ms | 6986 ms | ❌ |
+| Multi-step latency (avg) | < 15000 ms | 24914 ms | ❌ |
+| Tool success rate | ≥ 95% | 94.0% | ❌ |
+
+The three misses are latency- and tool-reliability-related; the flagship
+discharge fan-out is the slowest path (p95 28.4s). They are stated here rather
+than hidden — owning them is the honest posture for a clinical-safety project.
 
 ## Category Breakdown
 | Category | Passed | Total | Rate |
