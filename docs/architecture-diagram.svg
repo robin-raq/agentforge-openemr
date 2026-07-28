@@ -79,7 +79,7 @@
 
   <!-- ========== ROW 3: Agent Core ========== -->
   <rect x="200" y="255" width="700" height="65" rx="10" fill="url(#agentGrad)" filter="url(#shadow)" opacity="0.95"/>
-  <text x="550" y="280" text-anchor="middle" fill="white" font-size="14" font-weight="bold">LangChain.js Agent (Claude Sonnet 4)</text>
+  <text x="550" y="280" text-anchor="middle" fill="white" font-size="14" font-weight="bold">LangChain.js Agent (Claude Sonnet 4.5)</text>
   <text x="550" y="300" text-anchor="middle" fill="#dbeafe" font-size="11">createToolCallingAgent + AgentExecutor (max 6 iterations, 90s timeout)</text>
 
   <!-- Arrows: Agent to Tools -->
@@ -168,14 +168,14 @@
   <rect x="590" y="625" width="140" height="26" rx="5" fill="url(#obsGrad)" opacity="0.85"/>
   <text x="660" y="643" text-anchor="middle" fill="white" font-size="10">Langfuse Traces</text>
   <rect x="740" y="625" width="150" height="26" rx="5" fill="url(#obsGrad)" opacity="0.85"/>
-  <text x="815" y="643" text-anchor="middle" fill="white" font-size="10">479 Unit Tests</text>
+  <text x="815" y="643" text-anchor="middle" fill="white" font-size="10">494 Unit Tests</text>
   <rect x="900" y="625" width="155" height="26" rx="5" fill="url(#obsGrad)" opacity="0.85"/>
   <text x="977" y="643" text-anchor="middle" fill="white" font-size="10">125 Eval Cases</text>
 
   <rect x="590" y="658" width="140" height="26" rx="5" fill="url(#obsGrad)" opacity="0.85"/>
   <text x="660" y="676" text-anchor="middle" fill="white" font-size="10">Session Tracking</text>
   <rect x="740" y="658" width="150" height="26" rx="5" fill="url(#obsGrad)" opacity="0.85"/>
-  <text x="815" y="676" text-anchor="middle" fill="white" font-size="10">87.2% Pass Rate</text>
+  <text x="815" y="676" text-anchor="middle" fill="white" font-size="10">Current Eval: 82.4% Rubric</text>
   <rect x="900" y="658" width="155" height="26" rx="5" fill="url(#obsGrad)" opacity="0.85"/>
   <text x="977" y="676" text-anchor="middle" fill="white" font-size="10">Feedback Logging</text>
 
