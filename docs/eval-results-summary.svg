@@ -30,8 +30,8 @@
   <rect width="900" height="1536" fill="url(#bg)" rx="12"/>
 
   <!-- Header -->
-  <text x="40" y="45" font-size="24" font-weight="700" fill="#f8fafc">AgentForge Eval Results</text>
-  <text x="40" y="70" font-size="14" fill="#94a3b8">Clinical Query Agent for OpenEMR — 125 test cases</text>
+  <text x="40" y="45" font-size="24" font-weight="700" fill="#f8fafc">Historical Eval Baseline</text>
+  <text x="40" y="70" font-size="14" fill="#94a3b8">Retired Sonnet 4 · substring-graded · 125 cases</text>
 
   <!-- Pass rate badge -->
   <rect x="700" y="20" width="160" height="60" rx="10" fill="#052e16" stroke="#22c55e" stroke-width="1.5"/>
@@ -40,7 +40,7 @@
 
   <!-- Metrics row -->
   <rect x="40" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
-  <text x="120" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">479 Unit Tests ✅</text>
+  <text x="120" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">494 Unit Tests ✅</text>
   <rect x="210" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
   <text x="290" y="105" font-size="12" fill="#93c5fd" text-anchor="middle">10 Tools Covered ✅</text>
   <rect x="380" y="85" width="160" height="30" rx="6" fill="#1e3a5f"/>
@@ -229,6 +229,6 @@
   <rect x="310" y="1400" width="41.53846153846154" height="18" rx="4" fill="url(#blue-bar)"/>
   <text x="590" y="1414" font-size="13" fill="#93c5fd" font-weight="600">4 calls</text>
   <line x1="40" y1="1446" x2="860" y2="1446" stroke="#334155" stroke-width="1"/>
-  <text x="40" y="1471" font-size="12" fill="#64748b">Generated 2026-03-02 • LangChain.js + Claude Sonnet 4 • Vitest + Custom Eval Harness</text>
+  <text x="40" y="1471" font-size="12" fill="#64748b">Historical run 2026-03-02 • retired Sonnet 4 • substring assertions</text>
   <text x="40" y="1491" font-size="12" fill="#64748b">OpenEMR Clinical Query Agent — Built for Gauntlet AI Week 2 Bounty</text>
 </svg>
